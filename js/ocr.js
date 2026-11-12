@@ -226,3 +226,6 @@ function showShotResult(opts,title,low=new Set(),fixed={}){
     if(e.target.closest('[data-ocradd]')){const v=cleanLine($('#ocrFix').value).slice(0,20);if(!v)return;if(!opts[oi].names.includes(v))opts[oi].names.push(v);low.delete(v);picked.add(v);upd();setTimeout(()=>{const f=$('#ocrFix');f&&f.focus()},0)}
   };
 }
+
+// 이 파일이 불러와지면 바로 캡처 버튼을 보여줘요 (app.js가 예전 버전이어도 버튼이 나오게)
+try{initShotButton()}catch(e){}
