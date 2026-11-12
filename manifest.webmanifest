@@ -1,0 +1,17 @@
+{
+  "name": "스쿼드 메이커 - 동네축구 라인업",
+  "short_name": "스쿼드 메이커",
+  "description": "동네축구·풋살 라인업 짜기, 경기 기록, 선수 기록",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f3f1ea",
+  "theme_color": "#17663a",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
