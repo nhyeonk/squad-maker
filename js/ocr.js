@@ -31,6 +31,16 @@ async function getWorker(){
  * 2) 가로·세로로 빈 공간을 찾아 글자 덩어리(이름 하나, 제목 한 줄)를 하나씩 잘라내요
  * 3) 잘라낸 조각을 2배로 키워서 따로따로 읽어요 → 두 줄로 나란한 이름, 손글씨체 글꼴에도 강해요
  */
+// 획 굵게: 주변 3×3 칸 중 가장 어두운 값으로 (검은 글자가 1px씩 두꺼워져요)
+function thicken(cx,w,h){
+  const im=cx.getImageData(0,0,w,h),d=im.data,g=new Uint8Array(w*h);
+  for(let i=0;i<w*h;i++)g[i]=d[i*4];
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    let m=255;for(let dy=-1;dy<=1;dy++){const yy=y+dy;if(yy<0||yy>=h)continue;for(let dx=-1;dx<=1;dx++){const xx=x+dx;if(xx<0||xx>=w)continue;const v=g[yy*w+xx];if(v<m)m=v}}
+    const k=(y*w+x)*4;d[k]=d[k+1]=d[k+2]=m;
+  }
+  cx.putImageData(im,0,0);
+}
 async function prepImage(file){
   const bmp=await createImageBitmap(file);
   const W=bmp.width,H=bmp.height,U=W/1080;
@@ -63,13 +73,17 @@ async function prepImage(file){
     if(cur)parts.push(cur);
     for(const [x0,x1] of parts)if(x1-x0>=14*U)segs.push({x:x0,y:y0,w:x1-x0+1,h:y1-y0});
   }
-  // 조각 이미지 만들기 (여백 + 2배 확대)
+  // 조각 이미지 만들기
+  // - 글자 높이를 약 100px로 맞춰요 (캡처 크기가 달라도 같은 크기로 읽게)
+  // - 획을 살짝 굵게 해요 (손글씨체 글꼴에서 받침이 빠지는 걸 막아요: 재후→재훈)
   const pad=Math.round(10*U);
   return segs.slice(0,90).map(sg=>{
     const sx=Math.max(0,sg.x-pad),sy=Math.max(0,sg.y-pad),sw=Math.min(W-sx,sg.w+pad*2),sh=Math.min(H-sy,sg.h+pad*2);
-    const c=document.createElement('canvas');c.width=sw*2;c.height=sh*2;
-    const cx=c.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,c.width,c.height);
+    const f=Math.min(4,Math.max(1,100/sg.h));
+    const c=document.createElement('canvas');c.width=Math.max(1,Math.round(sw*f));c.height=Math.max(1,Math.round(sh*f));
+    const cx=c.getContext('2d',{willReadFrequently:true});cx.fillStyle='#fff';cx.fillRect(0,0,c.width,c.height);
     cx.imageSmoothingEnabled=true;cx.imageSmoothingQuality='high';cx.drawImage(a,sx,sy,sw,sh,0,0,c.width,c.height);
+    thicken(cx,c.width,c.height);
     return c;
   });
 }
@@ -112,8 +126,8 @@ function tidyName(t){
 }
 function headerLabel(t){
   const before=t.split(/[:：]/)[0].replace(/\d+\s*명\s*$/,'').trim();
-  const day=before.replace(/\s/g,'').match(DAY_RE);
-  if(day) return day[0];          // 날짜 숫자는 손글씨체에서 잘 틀려서 요일만 써요
+  const day=before.replace(/\s/g,'').match(/([월화수목금토일])요/);   // '금요및'처럼 끝 글자가 틀려도 요일을 알아봐요
+  if(day) return day[1]+'요일';          // 날짜 숫자는 손글씨체에서 잘 틀려서 요일만 써요
   const om=before.match(OPT_RE);if(om) return om[1];
   const w=before.replace(/[^\p{Script=Hangul}A-Za-z]/gu,'');
   const near=w&&w.length<=4?closest(w,OPT_WORDS,2):null;   // 예: '붕찰' → '불참'
@@ -124,8 +138,13 @@ function isHeader(raw,t){
   if(/\d+\s*명\s*$/.test(t)&&t.length<=20&&!UI_RE.test(t)) return true; // "참석 9명"
   const om=t.match(OPT_RE);return !!(om&&t.length<=om[0].length+6);
 }
+/* 한 번 고친 오타 기억하기: { 잘못 읽은 이름: 바른 이름 } */
+const FIX_KEY='squadmaker.ocrfix';
+function loadFixes(){try{return JSON.parse(localStorage.getItem(FIX_KEY))||{}}catch(e){return {}}}
+function saveFix(from,to){if(!from||!to||from===to)return;const m=loadFixes();m[from]=to;try{localStorage.setItem(FIX_KEY,JSON.stringify(m))}catch(e){}}
 function parseOCR(lines){
   const rosterNames=Object.values(roster).map(r=>r.name);
+  const learned=loadFixes();
   const hasHeader=lines.some(l=>{const raw=String(l.text||'');return isHeader(raw,cleanLine(raw))});
   const opts=[];let curO=null;const low=new Set(),fixed={};
   const getOpt=l=>{let o=opts.find(x=>x.label===l);if(!o){o={label:l,names:[]};opts.push(o)}return o};
@@ -147,6 +166,7 @@ function parseOCR(lines){
     if(/^[A-Za-z]{1,4}$/.test(name)) continue;                 // 아이콘을 영어로 잘못 읽은 짧은 글자
     if(/\p{Script=Hangul}/u.test(name)&&/[A-Za-z]/.test(name)) continue;  // 한글·영어가 섞인 잡음
     let conf=ln.confidence==null?100:ln.confidence;if(broken)conf=Math.min(conf,40);
+    if(learned[name]){fixed[learned[name]]=name;name=learned[name];conf=Math.max(conf,90)}   // 전에 고친 적 있는 오타
     if(!rosterNames.includes(name)&&/^[\p{Script=Hangul}]+$/u.test(name)){
       const near=closest(name,rosterNames.filter(r=>Math.abs(r.length-name.length)<=(broken?1:0)),name.length<=2?1:2);
       if(near){fixed[near]=name;name=near;conf=Math.max(conf,80)}   // 지난 참가자 이름으로 보정
@@ -209,9 +229,9 @@ function showShotResult(opts,title,low=new Set(),fixed={}){
     <div class="pick-label">추가할 사람 (눌러서 빼거나 넣기)</div>
     <div class="picks">${opts[oi].names.length?opts[oi].names.map(n=>{const id=byName[n];const inToday=id&&att.has(id);
       return `<button class="pick ${picked.has(n)?'on':''} ${id&&!inToday?'exist':''}" data-nm="${esc(n)}" ${inToday?'disabled title="이미 오늘 명단에 있어요"':''}>${low.has(n)?'❓':''}${esc(n)}${fixed[n]?`<span class="opt-cnt">← ${esc(fixed[n])}</span>`:''}</button>`}).join(''):'<span class="empty">이 항목은 이름이 보이지 않아요.</span>'}</div>
-    <div class="add-row" style="margin:-4px 0 8px"><input id="ocrFix" class="name-in" placeholder="빠지거나 틀린 이름 직접 입력" maxlength="20" style="font-weight:500"><button class="btn" data-ocradd="1">넣기</button></div>
+    <div class="add-row" style="margin:-4px 0 8px"><input id="ocrFix" class="name-in" placeholder="틀리거나 빠진 이름을 바르게 입력" maxlength="20" style="font-weight:500"><button class="btn" data-ocradd="1">넣기</button></div>
     ${rawBox()}
-    <p class="sub" style="margin:8px 0 8px">글자 인식이라 틀릴 수 있어요. 틀린 이름은 눌러서 빼고 위 칸에 바르게 적어 넣으세요. ❓는 흐릿하게 읽혀서 기본으로 빠져 있어요. "기존"은 지난 기록이 있는 선수예요.</p>`;
+    <p class="sub" style="margin:8px 0 8px">글자 인식이라 틀릴 수 있어요. 틀린 이름은 위 칸에 바른 이름을 적고 넣기를 누르면 비슷한 이름을 찾아 바꿔 주고, 다음부터는 자동으로 고쳐요. ❓는 흐릿하게 읽혀서 기본으로 빠져 있어요. "기존"은 지난 기록이 있는 선수예요.</p>`;
   closeModal();
   openModal('투표 명단',body(),[{label:'취소'},{label:'추가',primary:true,fn:()=>{
     const list=opts[oi].names.filter(n=>picked.has(n));
@@ -223,7 +243,17 @@ function showShotResult(opts,title,low=new Set(),fixed={}){
   modalClick=e=>{
     const o=e.target.closest('[data-oi]');if(o){oi=+o.dataset.oi;reset();upd();return}
     const n=e.target.closest('[data-nm]');if(n&&!n.disabled){const v=n.dataset.nm;picked.has(v)?picked.delete(v):picked.add(v);upd();return}
-    if(e.target.closest('[data-ocradd]')){const v=cleanLine($('#ocrFix').value).slice(0,20);if(!v)return;if(!opts[oi].names.includes(v))opts[oi].names.push(v);low.delete(v);picked.add(v);upd();setTimeout(()=>{const f=$('#ocrFix');f&&f.focus()},0)}
+    if(e.target.closest('[data-ocradd]')){
+      const v=tidyName(cleanLine($('#ocrFix').value)).slice(0,20);if(!v)return;
+      // 비슷한 이름이 이미 목록에 있으면 그걸 고친 걸로 봐요 (예: 정재후 → 정재훈) → 모든 항목에서 바꾸고 기억해요
+      const allNames=[...new Set(opts.flatMap(o=>o.names))].filter(n=>n!==v&&!Object.values(roster).some(r=>r.name===n));
+      const wrong=/^[\p{Script=Hangul}ㄱ-ㅣ]+$/u.test(v)?closest(v,allNames.filter(n=>Math.abs(n.length-v.length)<=1),3):null;
+      if(wrong){
+        for(const o of opts){const i=o.names.indexOf(wrong);if(i>=0){if(o.names.includes(v))o.names.splice(i,1);else o.names[i]=v}}
+        picked.delete(wrong);low.delete(wrong);picked.add(v);
+        fixed[v]=wrong;saveFix(wrong,v);toast(`${wrong} → ${v}로 고쳤어요. 다음부터는 자동으로 고쳐요`);
+      }else{if(!opts[oi].names.includes(v))opts[oi].names.push(v);low.delete(v);picked.add(v)}
+      $('#ocrFix').value='';upd();setTimeout(()=>{const f=$('#ocrFix');f&&f.focus()},0)}
   };
 }
 
