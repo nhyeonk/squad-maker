@@ -3,6 +3,7 @@ import { S, P, pname, lineup } from "../state.js";
 import { FORMATIONS, FUTSAL_MAX } from "../formations.js";
 import { currentSlots, teamPlayers, poolList, locate } from "../lineup.js";
 import { esc } from "../utils.js";
+import { attendanceCounts } from "../stats.js";
 import { posBadge, dot } from "./common.js";
 
 const isSel = (pid) => S.ui.sel === pid;
@@ -55,16 +56,27 @@ function side(l, T) {
 }
 
 function attendeesCard(l) {
-  const known = Object.values(S.players)
-    .filter((p) => !l.attendees.includes(p.id))
-    .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  const counts = attendanceCounts();
+  const notHere = Object.values(S.players).filter((p) => !l.attendees.includes(p.id));
+  const regulars = notHere.filter((p) => p.regular).sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  const others = notHere
+    .filter((p) => !p.regular)
+    .sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0) || a.name.localeCompare(b.name, "ko"));
+  const chip = (p) =>
+    `<button class="chip ghost" data-act="attend" data-v="${p.id}">+ ${esc(p.name)}${counts[p.id] ? ` <span style="font-size:11px;color:var(--mute)">${counts[p.id]}</span>` : ""}</button>`;
+  const hasRegular = Object.values(S.players).some((p) => p.regular);
+
   return `<div class="card" data-edit>
     <h3>오늘 참가자 <span class="badge">${l.attendees.filter(P).length}명</span></h3>
-    <form class="row" data-act="addnames"><input class="in" name="n" placeholder="이름 입력 (여러 명은 쉼표로)" autocomplete="off"><button class="btn pri">추가</button></form>
+    ${regulars.length ? `<button class="btn pri block" data-act="attendregulars">⭐ 고정 멤버 모두 추가 (${regulars.length}명)</button>
+      <div class="chips" style="margin:8px 0 4px">${regulars.map(chip).join("")}</div>` : ""}
+    ${others.length ? `<details class="others" ${regulars.length ? "" : "open"}><summary>${hasRegular ? "그 외 멤버" : "지난 참가자"} ${others.length}명 · 많이 온 순</summary>
+      <div class="chips" style="margin-top:6px">${others.map(chip).join("")}</div></details>` : ""}
+    ${!hasRegular && Object.keys(S.players).length ? `<p class="hint">자주 오는 사람은 이름을 눌러 <b>⭐ 고정 멤버</b>로 지정하면 한 번에 추가할 수 있어요.</p>` : ""}
+    <div style="border-top:1px solid var(--soft);margin:12px 0;"></div>
+    <form class="row" data-act="addnames"><input class="in" name="n" placeholder="새 이름 입력 (여러 명은 쉼표로)" autocomplete="off"><button class="btn pri">추가</button></form>
     <button class="btn kakao block" style="margin-top:8px" data-act="ocr">📷 카톡 투표 캡처로 추가</button>
-    <p class="hint">투표자 목록을 캡처해서 올리면 이름을 읽어 넣어요. 같은 이름은 같은 선수로 기록이 이어져요.</p>
-    ${known.length ? `<div style="margin-top:10px"><label class="lb">지난 참가자 · 눌러서 추가</label>
-      <div class="chips" style="margin-top:6px">${known.map((p) => `<button class="chip ghost" data-act="attend" data-v="${p.id}">+ ${esc(p.name)}</button>`).join("")}</div></div>` : ""}
+    <p class="hint">같은 이름은 같은 선수로 기록이 이어져요.</p>
   </div>`;
 }
 

@@ -46,6 +46,7 @@ export function openPlayer(pid) {
   const stars = [1, 2, 3, 4, 5].map((n) => `<button class="${n <= (p.skill || 3) ? "on" : ""}" data-act="pskill" data-v="${pid}:${n}" ${dis}>★</button>`).join("");
 
   openModal(`<h2>${ed ? `<input class="in" id="pnm" value="${esc(p.name)}" style="font-weight:800;font-size:17px">` : esc(p.name)}${closeBtn}</h2>
+    <div class="sec"><button class="btn block ${p.regular ? "pri" : "ghost"}" data-act="pregular" data-v="${pid}" ${dis}>${p.regular ? "⭐ 고정 멤버 (눌러서 해제)" : "☆ 고정 멤버로 지정"}</button></div>
     <div class="sec"><label>선호 포지션 · 누른 순서가 우선순위예요</label><div class="posbtns">${posBtns}</div></div>
     <div class="sec"><label>실력 (팀 밸런스용)</label><div class="stars">${stars}</div></div>
     <div class="sec"><label>기록</label>

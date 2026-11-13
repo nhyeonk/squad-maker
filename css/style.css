@@ -168,3 +168,5 @@ code{background:var(--soft);padding:1px 5px;border-radius:5px;font-size:12.5px}
 .ocr-ck{width:30px;height:30px;border-radius:9px;border:2px solid var(--line);flex:none;font-weight:900;color:#fff}
 .ocr-ck.on{background:var(--green);border-color:var(--green)}
 .btn.kakao{background:#fee500;color:#191600}
+details.others{margin-top:8px}
+details.others summary{font-size:12.5px;color:var(--sub);font-weight:700;cursor:pointer;padding:4px 0}

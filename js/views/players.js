@@ -47,7 +47,7 @@ export function viewPlayers() {
       const dec = s.w + s.d + s.l;
       const prefs = (P(s.id).pos || []).map((r) => `<span class="pb ${r}" style="margin:0 1px">${r}</span>`).join("");
       return `<tr class="click" data-act="info" data-v="${s.id}">
-        <td>${s.apps ? rank : ""}</td><td class="nm">${esc(pname(s.id))}</td>
+        <td>${s.apps ? rank : ""}</td><td class="nm">${esc(pname(s.id))}${P(s.id).regular ? " ⭐" : ""}</td>
         <td>${rp ? `<span class="pb ${rp}" style="font-size:11px;padding:2px 7px">${POS_KO[rp]}</span>` : "-"}</td>
         <td>${prefs || `<span style="color:var(--mute)">-</span>`}</td>
         <td>${s.apps || "-"}</td><td>${dec ? `${s.w}-${s.d}-${s.l}` : "-"}</td><td>${dec ? Math.round((s.w / dec) * 100) + "%" : "-"}</td>

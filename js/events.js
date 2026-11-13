@@ -23,7 +23,7 @@ function commitLineup() {
 const EDIT_ONLY = new Set([
   "tobench", "toteam", "topool", "attend", "unattend", "split", "fill", "clearteam", "resetall", "addteam", "delteam",
   "autoplace", "startmatch", "newmatch", "goal", "delgoal", "mstatus", "delmatch", "mrmplayer", "maddplayer",
-  "ppos", "pskill", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply",
+  "ppos", "pskill", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply", "pregular", "attendregulars",
 ]);
 
 const actions = {
@@ -286,6 +286,18 @@ const actions = {
     await api.putPlayer({ ...P(pid), pos });
     M.openPlayer(pid);
     render();
+  },
+  async pregular(v) {
+    await api.putPlayer({ ...P(v), regular: !P(v).regular });
+    M.openPlayer(v);
+    render();
+  },
+  attendregulars() {
+    const l = lineup();
+    const ids = Object.values(S.players).filter((p) => p.regular && !l.attendees.includes(p.id)).map((p) => p.id);
+    l.attendees.push(...ids);
+    commitLineup();
+    toast(`고정 멤버 ${ids.length}명 추가했어요`);
   },
   async pskill(v) {
     const [pid, n] = v.split(":");

@@ -56,3 +56,14 @@ export function recommendedPos(pid, s) {
   const top = Object.entries(s?.roles || {}).sort((a, b) => b[1] - a[1])[0];
   return top ? top[0] : (P(pid)?.pos || [])[0] || null;
 }
+
+/** 선수별 참가 횟수 (경기한 날짜 수) */
+export function attendanceCounts() {
+  const days = {};
+  Object.values(S.matches).forEach((m) =>
+    m.teams.forEach((T) => (T.players || []).forEach((pid) => (days[pid] ||= new Set()).add(m.date)))
+  );
+  const out = {};
+  for (const k in days) out[k] = days[k].size;
+  return out;
+}
