@@ -7,13 +7,18 @@ import { uid, todayStr } from "./utils.js";
 /** 라인업의 두 팀으로 경기 생성. 자리(포지션)도 함께 저장해 추천 포지션 계산에 써요 */
 export function createMatchFromLineup(teamA, teamB, title) {
   const l = lineup();
-  const slots = currentSlots();
   const snap = (i) => {
     const T = l.teams[i];
+    const slots = currentSlots(i);
     const roles = {};
-    Object.entries(T.slots).forEach(([k, pid]) => P(pid) && (roles[pid] = slots[k]?.role || "MF"));
+    const labels = {};
+    Object.entries(T.slots).forEach(([k, pid]) => {
+      if (!P(pid)) return;
+      roles[pid] = slots[k]?.role || "MF";
+      labels[pid] = slots[k]?.label || roles[pid];
+    });
     T.bench.filter(P).forEach((pid) => (roles[pid] = "SUB"));
-    return { name: T.name, color: T.color, players: teamPlayers(T).filter(P), roles };
+    return { name: T.name, color: T.color, players: teamPlayers(T).filter(P), roles, labels };
   };
   const m = {
     id: uid(), date: todayStr(), title: title || "", referee: l.referee || "",

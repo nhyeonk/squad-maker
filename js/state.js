@@ -29,6 +29,8 @@ export const S = {
   user: null,
   recorders: null, // { owner, emails[] } (Firebase 모드)
   isOwner: false,
+  requests: [], // 관리자에게 보이는 기록자 신청 목록
+  myRequest: null, // 내가 보낸 기록자 신청
   ready: false,
 };
 

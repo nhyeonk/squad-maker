@@ -6,6 +6,8 @@
 ## 주요 기능
 
 - **라인업**: 3 vs 3 ~ 11 vs 11, 인원별 포메이션, 풋살 코트(6인 이하)
+  - 선수를 **끌어서** 원하는 위치로 이동(다른 선수 위에 놓으면 맞교환), 위치에 맞춰 포지션 이름 자동 변경
+  - 포지션 직접 선택: LW LF LS ST CF SS RS RF RW / LAM CAM RAM LM LCM CM RCM RM LDM CDM RDM / LWB LB LCB CB RCB RB RWB SW / GK
 - **팀 나누기**: 실력(★1~5)과 선호 포지션을 보고 2~6팀으로 자동 분배
   - 나눈 뒤에도 선수를 눌러 **다른 팀으로 이동**하거나 **두 선수 맞교환** 가능
   - 빈자리 채우기, 후보, 대기 명단
@@ -77,7 +79,8 @@
 7. `js/config.js`의 `FIREBASE_CONFIG = null`을 복사한 값으로 바꾸고 커밋·푸시
    (또는 앱의 ⚙️ 설정에 붙여넣고 "공유 링크 복사"로 만든 링크를 공유)
 8. 앱 ⚙️ 설정 → **구글로 로그인** → **👑 이 계정을 관리자로 등록** (처음 한 번)
-9. ⚙️ 설정 → **기록자 관리**에 친구 구글 이메일 추가 → 친구는 구글로 로그인만 하면 바로 입력 가능
+9. 기록자 추가: 친구가 앱 ⚙️ 설정 → 구글로 로그인 → **✋ 기록자 신청하기** → 관리자 설정 버튼에 🔴 표시 → **승인**
+   (⚙️ 설정 → 기록자 관리에서 이메일로 직접 추가도 가능)
 
 > 로그인하지 않은 사람은 모두 **보기 전용**이에요. Firebase 웹 설정값(apiKey 등)은 비밀번호가 아니라 깃허브에 올려도 괜찮아요.
 > 쓰기 권한은 `firestore.rules`가 지켜요. 무료 요금제(Spark)로 동네 모임 규모는 충분해요.
@@ -96,6 +99,7 @@ groups/{그룹ID}/players/{선수ID}   { name, pos: ["MF","FW"], skill: 3 }
 groups/{그룹ID}/matches/{경기ID}   { date, title, referee, status, teams[2], goals[] }
 groups/{그룹ID}/meta/lineup        현재 라인업 (참가자, 팀 배치)
 recorders/{그룹ID}                  { owner: 관리자 이메일, emails: [기록자 이메일] }
+requests/{그룹ID}/items/{uid}       기록자 신청 { email, name, at }
 ```
 
 `js/config.js`의 `GROUP_ID`를 바꾸면 같은 Firebase 프로젝트로 여러 모임을 따로 운영할 수 있어요.
@@ -104,7 +108,7 @@ recorders/{그룹ID}                  { owner: 관리자 이메일, emails: [기
 
 | 바꾸고 싶은 것 | 파일 |
 | --- | --- |
-| 포메이션 추가/자리 위치 | `js/formations.js` |
+| 포메이션 추가/자리 위치, 포지션 목록·자동 이름 기준점 | `js/formations.js` |
 | 팀 나누기 방식 | `js/lineup.js` → `balanceSplit()` |
 | 포지션 적합도 점수 | `js/players.js` → `fit()` |
 | 캡처 인식 (자르는 영역, 무시할 단어) | `js/ocr.js` |

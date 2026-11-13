@@ -1,11 +1,12 @@
 // 버튼·입력 이벤트 처리
 // HTML의 data-act="이름" 버튼을 누르면 아래 actions["이름"]이 실행돼요. (data-v 값이 v로 들어와요)
 import { S, P, lineup, defaultLineup, mkTeam } from "./state.js";
-import { api, parseConfig, saveCfg, clearCfg, shareLink, login, logout, loginGoogle, claimOwner, setRecorders, loadLocal } from "./store.js";
+import { api, parseConfig, saveCfg, clearCfg, shareLink, login, logout, loginGoogle, claimOwner, setRecorders, loadLocal, requestAccess, cancelRequest, approveRequest, rejectRequest } from "./store.js";
 import { FORMATIONS } from "./formations.js";
 import { ensurePlayer, findByName, parseNames } from "./players.js";
 import { recognizeNames } from "./ocr.js";
-import { locate, removeFrom, movePlayer, autoPlace, relayoutAll, balanceSplit, fillEmpty, teamPlayers, poolList } from "./lineup.js";
+import { locate, removeFrom, movePlayer, autoPlace, relayoutAll, balanceSplit, fillEmpty, teamPlayers, poolList, currentSlots, setSlotLayout, resetSlotLayout } from "./lineup.js";
+import { nearestLabel } from "./formations.js";
 import { createMatchFromLineup, createBlankMatch, addGoal, removeGoal, addToMatch, removeFromMatch, updateMatchField } from "./matches.js";
 import { lineupText, saveSquadImage, exportBackup, importBackup, mergeData } from "./share.js";
 import * as M from "./views/modals.js";
@@ -23,7 +24,7 @@ function commitLineup() {
 const EDIT_ONLY = new Set([
   "tobench", "toteam", "topool", "attend", "unattend", "split", "fill", "clearteam", "resetall", "addteam", "delteam",
   "autoplace", "startmatch", "newmatch", "goal", "delgoal", "mstatus", "delmatch", "mrmplayer", "maddplayer",
-  "ppos", "pskill", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply", "pregular", "attendregulars", "rostertoggle",
+  "posopen", "posset", "posreset", "ppos", "pskill", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply", "pregular", "attendregulars", "rostertoggle",
 ]);
 
 const actions = {
@@ -69,6 +70,20 @@ const actions = {
       S.ui.sel = pid;
       render();
     } else if (poolList().length) toast("대기 명단에서 선수를 먼저 누르세요");
+  },
+  /* ----- 포지션 직접 바꾸기 ----- */
+  posopen: (v) => M.openPosPicker(+v),
+  posset(v) {
+    const [i, label] = v.split(":");
+    const s = currentSlots()[+i];
+    setSlotLayout(S.ui.team, +i, { x: s.x, y: s.y, label });
+    M.closeModal();
+    commitLineup();
+  },
+  posreset(v) {
+    resetSlotLayout(S.ui.team, +v);
+    M.closeModal();
+    commitLineup();
   },
   tobench() {
     if (!S.ui.sel) return toast("선수를 먼저 누르세요");
@@ -140,9 +155,12 @@ const actions = {
     commitLineup();
   },
   autoplace() {
-    lineup().teams.forEach((T, i) => autoPlace(i, teamPlayers(T).filter(P)));
+    lineup().teams.forEach((T, i) => {
+      T.layout = {};
+      autoPlace(i, teamPlayers(T).filter(P));
+    });
     commitLineup();
-    toast("선호 포지션대로 다시 배치했어요");
+    toast("포메이션 기본 자리에 선호 포지션대로 다시 배치했어요");
   },
   /* ----- 카톡 캡처 → 참가자 ----- */
   roster: () => M.openRoster(),
@@ -367,6 +385,15 @@ const actions = {
     M.openSettings();
   },
   async googlelogin() {
+    // 카톡·네이버·인스타 같은 앱 안 브라우저에서는 구글이 로그인을 막아요 → 기본 브라우저로 열기
+    const ua = navigator.userAgent;
+    if (/KAKAOTALK/i.test(ua)) {
+      location.href = "kakaotalk://web/openExternal?url=" + encodeURIComponent(location.href);
+      return;
+    }
+    if (/NAVER|Instagram|FBAN|FBAV|Line\/|DaumApps|everytimeApp|; wv\)/i.test(ua)) {
+      return toast("이 앱 안에서는 구글 로그인이 안 돼요. 오른쪽 위 메뉴에서 '다른 브라우저로 열기'를 눌러 주세요.");
+    }
     try {
       await loginGoogle();
       toast("로그인했어요");
@@ -383,6 +410,31 @@ const actions = {
     } catch (e) {
       toast(e.code === "permission-denied" ? "firestore.rules에 적은 관리자 이메일이 아니에요" : "실패: " + (e.code || e.message));
     }
+  },
+  async reqsend() {
+    try {
+      await requestAccess();
+      toast("기록자 신청을 보냈어요");
+    } catch (e) {
+      toast("신청 실패: " + (e.code || e.message));
+    }
+  },
+  async reqcancel() {
+    await cancelRequest().catch((e) => toast("실패: " + e.code));
+  },
+  async reqok(v) {
+    const r = S.requests.find((x) => x.uid === v);
+    try {
+      await approveRequest(v);
+      toast(`${r?.name || "신청자"}님을 기록자로 승인했어요`);
+    } catch (e) {
+      toast("실패: " + (e.code || e.message));
+    }
+  },
+  async reqno(v) {
+    const r = S.requests.find((x) => x.uid === v);
+    if (!confirm(`${r?.name || "이 사람"}의 신청을 거절할까요?`)) return;
+    await rejectRequest(v).catch((e) => toast("실패: " + e.code));
   },
   async recdel(v) {
     if (!confirm(`${M.maskEmail(v)}을(를) 기록자에서 뺄까요?`)) return;
@@ -498,11 +550,82 @@ const changes = {
   },
 };
 
+/* ---------- 경기장: 끌어서 옮기기 / 빈 잔디 눌러서 옮기기 ---------- */
+const clamp = (v) => Math.max(4, Math.min(96, v));
+function pitchPoint(e) {
+  const r = document.getElementById("pitch").getBoundingClientRect();
+  return { x: clamp(((e.clientX - r.left) / r.width) * 100), y: clamp(((e.clientY - r.top) / r.height) * 100) };
+}
+/** 자리를 (x,y)로 옮기기. 다른 자리 가까이 놓으면 그 자리 선수와 맞교환 */
+function dropSlot(slotIdx, pt) {
+  const t = S.ui.team;
+  const slots = currentSlots(t);
+  const near = slots.findIndex((s, i) => i !== slotIdx && Math.hypot(s.x - pt.x, (s.y - pt.y) * 0.68) < 6);
+  const T = lineup().teams[t];
+  if (near >= 0) {
+    // 자리끼리 선수 맞교환
+    const a = T.slots[slotIdx], b = T.slots[near];
+    if (b) T.slots[slotIdx] = b; else delete T.slots[slotIdx];
+    if (a) T.slots[near] = a; else delete T.slots[near];
+  } else {
+    setSlotLayout(t, slotIdx, { x: Math.round(pt.x * 10) / 10, y: Math.round(pt.y * 10) / 10, label: nearestLabel(pt.x, pt.y) });
+  }
+  commitLineup();
+}
+
+let drag = null, suppressClick = false;
+function bindPitchDrag() {
+  document.addEventListener("pointerdown", (e) => {
+    const el = e.target.closest("[data-drag]");
+    if (!el || !S.canEdit || e.button > 0) return;
+    drag = { el, idx: +el.dataset.drag, sx: e.clientX, sy: e.clientY, moving: false, id: e.pointerId };
+  });
+  document.addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (!drag.moving && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 8) return;
+    if (!drag.moving) {
+      drag.moving = true;
+      drag.el.classList.add("dragging");
+      try { drag.el.setPointerCapture(e.pointerId); } catch {}
+    }
+    e.preventDefault();
+    const pt = pitchPoint(e);
+    drag.el.style.left = pt.x + "%";
+    drag.el.style.top = pt.y + "%";
+    const lab = drag.el.querySelector(".rl") || drag.el.querySelector(".cir");
+    if (lab) lab.textContent = nearestLabel(pt.x, pt.y);
+  }, { passive: false });
+  const end = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const d = drag;
+    drag = null;
+    if (!d.moving) return;
+    suppressClick = true;
+    setTimeout(() => (suppressClick = false), 50);
+    dropSlot(d.idx, pitchPoint(e));
+  };
+  document.addEventListener("pointerup", end);
+  document.addEventListener("pointercancel", (e) => {
+    if (drag && e.pointerId === drag.id) {
+      drag = null;
+      render();
+    }
+  });
+}
+
 export function bindEvents() {
+  bindPitchDrag();
   document.addEventListener("click", async (e) => {
     const el = e.target.closest("[data-act]");
     if (!el || el.tagName === "FORM") return;
+    if (suppressClick) return;
     const act = el.dataset.act;
+    // 빈 잔디 누르기: 선택한 선수(이 팀 경기장 위)를 그 자리로 옮겨요
+    if (act === "pitch") {
+      const loc = S.ui.sel && locate(S.ui.sel);
+      if (S.canEdit && loc?.kind === "slot" && loc.team === S.ui.team) dropSlot(loc.slot, pitchPoint(e));
+      return;
+    }
     if (act === "maskclose") {
       if (e.target === el) M.closeModal();
       return;

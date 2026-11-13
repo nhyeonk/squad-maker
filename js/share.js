@@ -9,15 +9,15 @@ import { clone, download, fmtDate, todayStr, toast } from "./utils.js";
 /* ---------- 카톡용 명단 텍스트 ---------- */
 export function lineupText() {
   const l = lineup();
-  const slots = currentSlots();
   let s = `⚽ ${fmtDate(todayStr())} ${l.size} vs ${l.size} 라인업\n`;
   if (l.referee) s += `심판: ${l.referee}\n`;
-  l.teams.forEach((T) => {
+  l.teams.forEach((T, ti) => {
+    const slots = currentSlots(ti);
     const ids = teamPlayers(T).filter(P);
     if (!ids.length) return;
     s += `\n${T.name} (${ids.length}명)\n`;
     const by = { GK: [], DF: [], MF: [], FW: [] };
-    Object.entries(T.slots).forEach(([k, pid]) => P(pid) && by[slots[k]?.role || "MF"].push(pname(pid)));
+    Object.entries(T.slots).forEach(([k, pid]) => P(pid) && by[slots[k]?.role || "MF"].push(`${pname(pid)}(${slots[k]?.label})`));
     ["GK", "DF", "MF", "FW"].forEach((r) => by[r].length && (s += `${r} ${by[r].join(", ")}\n`));
     const bench = T.bench.filter(P);
     if (bench.length) s += `후보 ${bench.map(pname).join(", ")}\n`;

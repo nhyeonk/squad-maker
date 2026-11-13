@@ -32,13 +32,13 @@ function pitch(l, T, slots) {
       const pid = T.slots[i];
       const p = pid && P(pid);
       return `<button class="slot ${p ? "filled" : ""} ${p && isSel(pid) ? "sel" : ""} ${sel && !p ? "target" : ""}"
-        style="left:${s.x}%;top:${s.y}%" data-act="slot" data-v="${i}">
+        style="left:${s.x}%;top:${s.y}%" data-act="slot" data-v="${i}" data-drag="${i}">
         <span class="cir role-${s.role}">${p ? `<span class="rl role-${s.role}">${esc(s.label)}</span>` : esc(s.label)}</span>
         ${p ? `<span class="nm">${esc(p.name)}</span>` : ""}</button>`;
     })
     .join("");
   const futsal = l.size <= FUTSAL_MAX;
-  return `<div class="pitch ${futsal ? "futsal" : ""}">
+  return `<div class="pitch ${futsal ? "futsal" : ""} ${sel && S.canEdit ? "picking" : ""}" id="pitch" data-act="pitch">
     <span class="tag">${esc(T.name)} · ${l.size}인 ${esc(l.formation)}</span>${pitchLines(futsal)}${slotHtml}</div>`;
 }
 
@@ -115,7 +115,7 @@ function teamsCard(l, t, slots) {
         ? ids
             .map((id) => {
               const lc = locate(id);
-              const role = lc?.kind === "slot" ? slots[lc.slot]?.label : "후보";
+              const role = lc?.kind === "slot" ? currentSlots(i)[lc.slot]?.label : "후보";
               return `<button class="chip ${isSel(id) ? "sel" : ""}" data-act="pl" data-v="${id}">${esc(pname(id))} <span style="font-size:10.5px;color:var(--sub)">${esc(role)}</span></button>`;
             })
             .join("")
@@ -161,7 +161,7 @@ export function viewLineup() {
     </div>
     <div class="pitchwrap">${pitch(l, T, slots)}${side(l, T)}</div>
     <div class="legend"><span><i style="border-color:var(--fw)"></i>FW</span><span><i style="border-color:var(--mf)"></i>MF</span><span><i style="border-color:var(--df)"></i>DF</span><span><i style="border-color:var(--gk)"></i>GK</span></div>
-    <p class="hint" data-edit>선수를 누르고 → 빈자리나 다른 선수를 누르면 이동·교체돼요. 다른 팀 선수를 누르면 두 선수의 팀이 서로 바뀌어요.</p>
+    <p class="hint" data-edit>선수를 <b>끌어서</b> 원하는 곳에 놓으면 자리가 옮겨지고, 다른 선수 위에 놓으면 서로 바뀌어요. 눌러서 선택한 뒤 빈 잔디를 눌러도 돼요. 포지션 이름은 위치에 맞게 바뀌고, 아래 바의 <b>포지션</b>으로 직접 고를 수도 있어요.</p>
     <div style="display:grid;gap:8px;margin-top:12px">
       <div class="grid2"><button class="btn" data-act="img">🖼️ 스쿼드 이미지 저장</button><button class="btn" data-act="copytext">📋 명단 텍스트 복사</button></div>
       <button class="btn pri block" data-act="startmatch" data-edit>⚽ 이 라인업으로 경기 기록 시작</button>
@@ -176,7 +176,10 @@ export function viewSelbar() {
   const sel = S.ui.sel;
   if (!sel || S.ui.tab !== "lineup" || !P(sel)) return "";
   const loc = locate(sel);
-  return `<div class="selbar"><span><b>${esc(pname(sel))}</b> 선택됨</span>
+  const onPitch = loc?.kind === "slot" && loc.team === S.ui.team;
+  const label = onPitch ? currentSlots()[loc.slot]?.label : "";
+  return `<div class="selbar"><span><b>${esc(pname(sel))}</b> ${onPitch ? esc(label) : "선택됨"}</span>
+    ${onPitch && S.canEdit ? `<button class="btn sm" data-act="posopen" data-v="${loc.slot}">포지션</button>` : ""}
     <button class="btn sm" data-act="info" data-v="${sel}">정보</button>
     ${loc?.kind !== "pool" ? `<button class="btn sm" data-act="topool">대기로</button>` : ""}
     <button class="btn sm" data-act="unsel">취소</button></div>`;

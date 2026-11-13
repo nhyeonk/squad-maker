@@ -1,8 +1,8 @@
 // 팝업 창들: 선수 정보, 골 입력, 경기 시작, 출전 선수 추가, 설정
 import { S, P, pname, lineup } from "../state.js";
-import { POS, POS_KO } from "../formations.js";
+import { POS, POS_KO, POSITION_GROUPS } from "../formations.js";
 import { computeStats, scoreOf } from "../stats.js";
-import { teamPlayers } from "../lineup.js";
+import { teamPlayers, currentSlots } from "../lineup.js";
 import { getCfg, groupId } from "../store.js";
 import { GROUP_ID } from "../config.js";
 import { $, esc, fmtDate, todayStr } from "../utils.js";
@@ -202,7 +202,12 @@ function accountSection() {
   else if (!S.recorders && !S.recordersDenied)
     status = `<p class="hint">아직 관리자가 없어요. firestore.rules에 적은 관리자 이메일이라면 아래 버튼을 누르세요.</p>
       <button class="btn pri block" data-act="claimowner">👑 이 계정을 관리자로 등록</button>`;
-  else status = `<p class="hint">👀 보기 전용이에요. 관리자에게 <b>${email}</b>을(를) 기록자로 추가해 달라고 하세요.</p>`;
+  else if (S.myRequest)
+    status = `<div class="reqbox"><b>⏳ 기록자 신청 완료</b><span>관리자가 승인하면 바로 입력할 수 있어요.</span>
+      <button class="btn sm ghost" data-act="reqcancel">신청 취소</button></div>`;
+  else
+    status = `<p class="hint">👀 보기 전용이에요. 기록을 입력하고 싶으면 신청하세요. 관리자가 승인하면 바로 입력할 수 있어요.</p>
+      <button class="btn pri block" data-act="reqsend">✋ 기록자 신청하기</button>`;
   return `<div class="sec"><label>내 계정 <span class="badge">${email}</span></label>${status}
     <button class="btn block" style="margin-top:8px" data-act="logout">로그아웃</button></div>`;
 }
@@ -217,15 +222,23 @@ export function maskEmail(e = "") {
 
 function recordersSection() {
   const list = S.recorders?.emails || [];
-  const open = S.ui.recordersOpen ? "open" : "";
+  const reqs = S.requests || [];
+  const open = S.ui.recordersOpen || reqs.length ? "open" : "";
+  const reqHtml = reqs.length
+    ? `<div class="reqlist"><div class="reqtitle">✋ 기록자 신청 ${reqs.length}건</div>${reqs
+        .map((r) => `<div class="reqrow"><div style="min-width:0"><b>${esc(r.name || "(이름 없음)")}</b><small>${esc(r.email)}</small></div>
+          <button class="btn sm pri" data-act="reqok" data-v="${esc(r.uid)}">승인</button><button class="btn sm ghost" data-act="reqno" data-v="${esc(r.uid)}">거절</button></div>`)
+        .join("")}</div>`
+    : "";
   return `<div class="sec"><details class="recbox" ${open} data-act-toggle="recordersOpen">
-    <summary><span>✏️ 기록자 <b>${list.length + 1}명</b> · 관리</span><span class="chev">›</span></summary>
+    <summary><span>✏️ 기록자 <b>${list.length + 1}명</b> · 관리${reqs.length ? ` <span class="reqdot">신청 ${reqs.length}</span>` : ""}</span><span class="chev">›</span></summary>
+    ${reqHtml}
     <div class="reclist">
       <div class="recrow"><span>👑 ${esc(maskEmail(S.recorders.owner))}</span><span class="rectag">관리자</span></div>
       ${list.map((e) => `<div class="recrow"><span title="${esc(e)}">${esc(maskEmail(e))}</span><button class="recdel" data-act="recdel" data-v="${esc(e)}" aria-label="삭제">×</button></div>`).join("")}
     </div>
-    <form class="row" data-act="recadd" style="margin-top:10px"><input class="in" name="n" type="email" placeholder="기록자 구글 이메일 추가"><button class="btn pri">추가</button></form>
-    <p class="hint">추가된 사람은 구글로 로그인하면 바로 기록을 입력할 수 있어요.</p>
+    <form class="row" data-act="recadd" style="margin-top:10px"><input class="in" name="n" type="email" placeholder="이메일로 직접 추가"><button class="btn pri">추가</button></form>
+    <p class="hint">친구가 앱에서 구글로 로그인한 뒤 <b>기록자 신청</b>을 누르면 여기에 떠요.</p>
   </details></div>`;
 }
 
@@ -245,4 +258,17 @@ export function openRoster() {
     ${others.length ? `<div class="sec"><label>다른 선수${ed ? " · 눌러서 고정 참여로" : ""}</label>
       <div class="chips">${others.map((p) => `<button class="chip ghost" data-act="rostertoggle" data-v="${p.id}" ${ed ? "" : "disabled"}>+ ${esc(p.name)}</button>`).join("")}</div></div>` : ""}
     <button class="btn block" data-act="close">완료</button>`);
+}
+
+/* ---------- 포지션 고르기 ---------- */
+export function openPosPicker(slotIdx) {
+  const s = currentSlots()[slotIdx];
+  const pid = lineup().teams[S.ui.team].slots[slotIdx];
+  const group = (role, title) =>
+    `<div class="sec"><label>${title}</label><div class="posgrid">${POSITION_GROUPS[role]
+      .map((l) => `<button class="pg ${role} ${l === s.label ? "on" : ""}" data-act="posset" data-v="${slotIdx}:${l}">${l}</button>`)
+      .join("")}</div></div>`;
+  openModal(`<h2>${pid ? esc(pname(pid)) + " · " : ""}포지션${closeBtn}</h2>
+    ${group("FW", "공격")}${group("MF", "미드필더")}${group("DF", "수비")}${group("GK", "골키퍼")}
+    ${s.moved ? `<button class="btn block" data-act="posreset" data-v="${slotIdx}">포메이션 원래 자리로</button>` : ""}`);
 }

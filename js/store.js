@@ -148,6 +148,51 @@ function updatePermission() {
 }
 
 const recordersRef = () => FB.fs.doc(FB.db, "recorders", FB.gid);
+const requestsCol = () => FB.fs.collection(FB.db, "requests", FB.gid, "items");
+const myRequestRef = () => FB.fs.doc(FB.db, "requests", FB.gid, "items", S.user.uid);
+
+/* ---------- 기록자 신청 → 관리자 승인 ----------
+ * requests/{그룹ID}/items/{신청자uid} = { email, name(구글 이름), at }
+ * 신청자 본인과 관리자만 볼 수 있어요.
+ */
+export async function requestAccess() {
+  await FB.fs.setDoc(myRequestRef(), { email: myEmail(), name: S.user.displayName || "", at: Date.now() });
+}
+export async function cancelRequest() {
+  await FB.fs.deleteDoc(myRequestRef());
+}
+export async function approveRequest(uid) {
+  const r = S.requests.find((x) => x.uid === uid);
+  if (!r) return;
+  await setRecorders([...(S.recorders.emails || []), r.email]);
+  await FB.fs.deleteDoc(FB.fs.doc(FB.db, "requests", FB.gid, "items", uid));
+}
+export async function rejectRequest(uid) {
+  await FB.fs.deleteDoc(FB.fs.doc(FB.db, "requests", FB.gid, "items", uid));
+}
+
+/** 관리자면 신청 목록 전체, 아니면 내 신청만 실시간으로 지켜봐요 */
+let unsubReq = null, reqMode = null;
+function watchRequests() {
+  const mode = !S.user ? null : S.isOwner ? "owner" : S.canEdit ? null : "self";
+  if (mode === reqMode) return;
+  unsubReq?.();
+  unsubReq = null;
+  reqMode = mode;
+  S.requests = [];
+  S.myRequest = null;
+  if (mode === "owner") {
+    unsubReq = FB.fs.onSnapshot(requestsCol(), (snap) => {
+      S.requests = snap.docs.map((d) => ({ uid: d.id, ...d.data() })).sort((a, b) => a.at - b.at);
+      hooks.render();
+    }, (e) => console.warn(e));
+  } else if (mode === "self") {
+    unsubReq = FB.fs.onSnapshot(myRequestRef(), (d) => {
+      S.myRequest = d.exists() ? d.data() : null;
+      hooks.render();
+    }, (e) => console.warn(e));
+  }
+}
 
 /** 처음 한 번: 이 계정을 관리자로 등록 (firestore.rules에 적은 관리자만 성공해요) */
 export async function claimOwner() {
@@ -186,6 +231,7 @@ export async function initFirebase(cfg) {
     updatePermission();
     unsubRec?.();
     unsubRec = null;
+    watchRequests();
     if (u) {
       S.recordersLoaded = false;
       S.recordersDenied = false;
@@ -195,6 +241,7 @@ export async function initFirebase(cfg) {
           S.recorders = d.exists() ? d.data() : null;
           S.recordersLoaded = true;
           updatePermission();
+          watchRequests();
           hooks.render();
         },
         (e) => {
@@ -202,6 +249,7 @@ export async function initFirebase(cfg) {
           console.warn(e);
           S.recordersLoaded = true;
           S.recordersDenied = e.code === "permission-denied";
+          watchRequests();
           hooks.render();
         }
       );

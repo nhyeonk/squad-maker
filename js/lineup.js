@@ -1,13 +1,35 @@
 // 라인업 로직: 선수 이동/교체, 자동 배치, 밸런스 팀 나누기
 import { S, P, lineup } from "./state.js";
-import { formationSlots } from "./formations.js";
+import { formationSlots, roleOfLabel } from "./formations.js";
 import { fit } from "./players.js";
 import { shuffle } from "./utils.js";
 
-export const currentSlots = () => {
+/**
+ * 팀의 자리 목록 = 포메이션 기본 자리 + 그 팀에서 직접 옮기거나 이름을 바꾼 자리(T.layout)
+ * T.layout = { [자리번호]: { x, y, label } }
+ */
+export const currentSlots = (teamIdx = S.ui.team) => {
   const l = lineup();
-  return formationSlots(l.size, l.formation);
+  const base = formationSlots(l.size, l.formation);
+  const lay = l.teams[teamIdx]?.layout || {};
+  return base.map((s, i) => {
+    const o = lay[i];
+    if (!o) return s;
+    const label = o.label || s.label;
+    return { ...s, ...o, label, role: roleOfLabel(label), moved: true };
+  });
 };
+
+/** 자리 위치/이름 바꾸기 */
+export function setSlotLayout(teamIdx, slotIdx, patch) {
+  const T = lineup().teams[teamIdx];
+  T.layout = T.layout || {};
+  T.layout[slotIdx] = { ...(T.layout[slotIdx] || {}), ...patch };
+}
+export function resetSlotLayout(teamIdx, slotIdx) {
+  const T = lineup().teams[teamIdx];
+  if (T.layout) delete T.layout[slotIdx];
+}
 export const teamPlayers = (T) => [...Object.values(T.slots), ...T.bench];
 export const poolList = () => lineup().attendees.filter((id) => P(id) && locate(id)?.kind === "pool");
 
@@ -53,7 +75,7 @@ export function movePlayer(pid, dest) {
   if (dest.kind === "team") {
     removeFrom(from, pid);
     const T = l.teams[dest.team];
-    const slots = currentSlots();
+    const slots = currentSlots(dest.team);
     const free = slots.map((_, i) => i).filter((i) => !T.slots[i]);
     if (free.length) {
       free.sort((a, b) => fit(pid, slots[b].role) - fit(pid, slots[a].role));
@@ -83,7 +105,7 @@ export function movePlayer(pid, dest) {
 /** 선호 포지션에 맞게 팀 안에서 자리 배치 (남는 인원은 후보) */
 export function autoPlace(teamIdx, pids) {
   const T = lineup().teams[teamIdx];
-  const slots = currentSlots();
+  const slots = currentSlots(teamIdx);
   T.slots = {};
   T.bench = [];
   const pairs = [];
@@ -100,7 +122,10 @@ export function autoPlace(teamIdx, pids) {
 
 /** 인원·포메이션이 바뀌면 각 팀 선수를 새 자리에 다시 배치 */
 export function relayoutAll() {
-  lineup().teams.forEach((T, i) => autoPlace(i, teamPlayers(T).filter(P)));
+  lineup().teams.forEach((T, i) => {
+    T.layout = {}; // 포메이션이 바뀌면 직접 옮긴 자리는 초기화
+    autoPlace(i, teamPlayers(T).filter(P));
+  });
 }
 
 /**
@@ -154,7 +179,7 @@ export function balanceSplit() {
 /** 대기 명단 선수로 지금 보는 팀의 빈자리 채우기 */
 export function fillEmpty(teamIdx) {
   const T = lineup().teams[teamIdx];
-  const slots = currentSlots();
+  const slots = currentSlots(teamIdx);
   const pool = shuffle(poolList());
   if (!pool.length) return false;
   const free = slots.map((_, i) => i).filter((i) => !T.slots[i]);

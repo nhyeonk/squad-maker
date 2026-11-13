@@ -13,6 +13,8 @@ function renderChrome() {
   else [sync.className, sync.textContent] = ["sync ro", "● 실시간 · 보기 전용"];
 
   document.body.classList.toggle("ro", !S.canEdit);
+  // 관리자에게 기록자 신청이 오면 설정 버튼에 빨간 점
+  document.querySelector('[data-act="settings"]')?.classList.toggle("has-dot", S.isOwner && (S.requests || []).length > 0);
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.v === S.ui.tab));
 
   $("#banner").innerHTML =
