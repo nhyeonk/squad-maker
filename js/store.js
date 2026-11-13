@@ -2,30 +2,129 @@
  * 데이터·저장: 상태, 이 기기 저장(localStorage), 저장 대기열, 계산용 함수
  */
 /* ================= data ================= */
-let roster={};    // pid -> {name, createdAt}
-let matches={};   // id -> match
+const DATA_VERSION=4;
+const TIERS=['S','A','B','C','F'];
+let groups={};
+let defaultGroupId=null, activeGroupId=null;
+let roster={};    // 활성 모임의 선수
+let matches={};   // 활성 모임의 경기
 let cur=freshCurrent();
-let mode='local', readOnly=false, loaded=false;
-let view='lineup', openMatch=null, statSort='g', openStat=null;
+let readOnly=false, loaded=false;
+let view='groups', openMatch=null, statSort='g', openStat=null;
 let sel=null;
+let lastStored=null;
 
-/* ---- 저장 ----
- * 지금은 이 기기(localStorage)에만 저장해요.
- * 나중에 Firebase 같은 서버를 붙일 때는 아래 putCurrent·putPlayer·putMatch 같은 저장 함수 안만 바꾸면 돼요.
- */
-function saveLocal(){try{localStorage.setItem(LKEY,JSON.stringify({roster,matches,cur}))}catch(e){toast('저장 공간이 부족해서 저장하지 못했어요')}}
-function loadLocal(){try{const s=JSON.parse(localStorage.getItem(LKEY));if(s){roster=s.roster||{};matches=s.matches||{};if(s.cur&&s.cur.teams)cur=s.cur}}catch(e){}}
-function putCurrent(){saveLocal()}
-function putPlayer(pid){saveLocal()}
-function delPlayerDoc(pid){saveLocal()}
-function putMatch(id,delay){saveLocal()}
-function delMatchDoc(id){saveLocal()}
-function commit(){putCurrent();renderAll()}
+function activeGroup(){return activeGroupId===null?null:groups[activeGroupId]}
+function appData(){return {v:DATA_VERSION,defaultGroupId,groups}}
+function writeLocal(data){
+  try{
+    if(localStorage.getItem(LKEY)!==lastStored){
+      toast('다른 탭에서 기록이 바뀌었어요. 새로고침한 뒤 다시 시도하세요.');
+      return false;
+    }
+    const serialized=JSON.stringify(data);
+    localStorage.setItem(LKEY,serialized);
+    lastStored=serialized;
+    return true;
+  }catch(e){
+    toast('브라우저에 기록을 저장하지 못했어요');
+    return false;
+  }
+}
+function saveLocal(){
+  const group=activeGroup();
+  if(group) group.cur=cur;
+  return writeLocal(appData());
+}
+function loadLocal(){
+  try{
+    lastStored=localStorage.getItem(LKEY);
+    return readAppData(JSON.parse(lastStored));
+  }catch(e){return null}
+}
+function putCurrent(){return saveLocal()}
+function putPlayer(){return saveLocal()}
+function putMatch(){return saveLocal()}
+function delMatchDoc(){return saveLocal()}
+function commit(){const saved=putCurrent();renderAll();return saved}
+
+function isRecord(value){return value!==null&&typeof value==='object'&&!Array.isArray(value)}
+function recordEntries(records){
+  return Object.entries(isRecord(records)?records:{}).filter(([id,value])=>/^[a-z0-9][a-z0-9_-]*$/i.test(id)&&isRecord(value));
+}
+function normalizeCur(saved, players){
+  const lineup=isRecord(saved?.teams?.A)?clone(saved):freshCurrent();
+  if(!Number.isInteger(lineup.size)||lineup.size<MIN||lineup.size>MAX) lineup.size=11;
+  if(!Number.isInteger(lineup.teamCount)||lineup.teamCount<1||lineup.teamCount>MAXT) lineup.teamCount=2;
+  lineup.teams=Object.fromEntries(TK.slice(0,lineup.teamCount).filter(key=>isRecord(lineup.teams[key])).map(key=>[key,lineup.teams[key]]));
+  ensureTeams(lineup);
+
+  const assigned=new Set();
+  const keepPlayer=id=>{
+    if(typeof id!=='string'||!Object.hasOwn(players,id)||assigned.has(id)) return false;
+    assigned.add(id);
+    return true;
+  };
+  for(const team of Object.values(lineup.teams)){
+    for(const slot of team.slots) if(!keepPlayer(slot.pid)) slot.pid=null;
+    team.subs=team.subs.filter(keepPlayer);
+  }
+  const attendees=Array.isArray(lineup.attendees)?lineup.attendees:[];
+  lineup.attendees=[...new Set([...attendees.filter(id=>typeof id==='string'&&Object.hasOwn(players,id)),...assigned])];
+  return lineup;
+}
+function makeGroup(name, data={}){
+  const players=Object.fromEntries(recordEntries(data.roster).filter(([,player])=>typeof player.name==='string'));
+  const games=Object.fromEntries(recordEntries(data.matches).filter(([,game])=>isRecord(game.teams?.A)&&isRecord(game.teams?.B)));
+  const lineup=normalizeCur(data.cur,players);
+  lineup.title=name;
+  const squads=Array.isArray(data.squads)?data.squads.filter(squad=>isRecord(squad)&&typeof squad.id==='string'&&typeof squad.name==='string'&&isRecord(squad.lineup)):[];
+  return {name,roster:players,matches:games,cur:lineup,squads};
+}
+function readAppData(data){
+  if(!isRecord(data)) return null;
+  let records;
+  if(data.v===DATA_VERSION&&isRecord(data.groups)){
+    records=recordEntries(data.groups).map(([id,group])=>[id,makeGroup(String(group.name||'기존 모임'),group)]);
+  }else if(isRecord(data.roster)&&isRecord(data.matches)){
+    if(data.cur?.v===3&&isRecord(data.cur.groups)){
+      const byGroup=(entries,id)=>Object.fromEntries(recordEntries(entries).filter(([,record])=>(record.groupId||'legacy')===id));
+      records=recordEntries(data.cur.groups).map(([id,lineup])=>[
+        id,makeGroup(String(lineup.title||'기존 모임'),{roster:byGroup(data.roster,id),matches:byGroup(data.matches,id),cur:lineup})
+      ]);
+    }else if(data.cur?.started||Object.keys(data.roster).length||Object.keys(data.matches).length){
+      records=[['legacy',makeGroup(String(data.cur?.title||'').trim()||'기존 모임',data)]];
+    }else records=[];
+  }else return null;
+
+  const restoredGroups=Object.fromEntries(records);
+  const defaultId=Object.hasOwn(restoredGroups,data.defaultGroupId)?data.defaultGroupId:records[0]?.[0]??null;
+  return {v:DATA_VERSION,defaultGroupId:defaultId,groups:restoredGroups};
+}
+function useAppData(data){
+  if(!data) return;
+  groups=data.groups;
+  defaultGroupId=data.defaultGroupId;
+  activateGroup(defaultGroupId);
+}
 
 /* ================= derived ================= */
 const T=()=>cur.teams[cur.active];
-const keys=()=>TK.slice(0,cur.teamCount||2);
-function ensureTeams(){keys().forEach((k,i)=>{if(!cur.teams[k])cur.teams[k]=newTeam(k+'팀',COLORS[i],cur.size);const t=cur.teams[k];t.color=COLORS[i];if(/^[A-H]팀$/.test(t.name))t.name=k+'팀'});for(const k of keys()){if(!Array.isArray(cur.teams[k].subs))cur.teams[k].subs=[];if(cur.teams[k].slots.length!==cur.size)remap(cur.teams[k],FORMATIONS[cur.size][0])}if(!keys().includes(cur.active))cur.active='A'}
+const keys=(lineup=cur)=>TK.slice(0,lineup.teamCount||2);
+function ensureTeams(lineup=cur){
+  const teamKeys=keys(lineup);
+  teamKeys.forEach((key,i)=>{
+    const formation=FORMATIONS[lineup.size][0];
+    const team=lineup.teams[key]||(lineup.teams[key]=newTeam(key+'팀',COLORS[i],lineup.size));
+    team.color=COLORS[i];
+    if(typeof team.name!=='string'||/^[A-H]팀$/.test(team.name)) team.name=key+'팀';
+    if(!Array.isArray(team.subs)) team.subs=[];
+    if(!Array.isArray(team.slots)) team.slots=[];
+    team.slots=team.slots.filter(slot=>Number.isFinite(slot?.x)&&Number.isFinite(slot?.y));
+    if(team.slots.length!==lineup.size) remap(team,formation);
+  });
+  if(!teamKeys.includes(lineup.active)) lineup.active='A';
+}
 const pname=id=>roster[id]?roster[id].name:'(삭제됨)';
 const subsOf=t=>Array.isArray(t.subs)?t.subs:(t.subs=[]);
 function assignedIds(){const s=new Set();for(const k of keys()){for(const sl of cur.teams[k].slots)if(sl.pid)s.add(sl.pid);for(const p of subsOf(cur.teams[k]))s.add(p)}return s}

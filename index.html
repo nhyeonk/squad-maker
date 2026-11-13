@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
 <div class="app">
@@ -26,10 +26,21 @@
       <div><h1>스쿼드 메이커</h1><small>동네축구 · 풋살 라인업 & 기록</small></div>
     </div>
     <span style="flex:1"></span>
+    <button class="btn outline hidden" id="groupsBtn">모임 목록</button>
     <button class="btn primary hidden" id="installBtn" style="font-size:13px;padding:8px 12px">앱 설치</button>
   </header>
 
-  <nav class="nav" id="nav">
+  <section class="groups-page hidden" id="vGroups" aria-labelledby="groupsTitle">
+    <div class="section-heading">
+      <h2 id="groupsTitle">모임 목록</h2>
+      <button class="btn outline hidden" id="groupsBack">라인업으로</button>
+      <button class="btn primary" id="addGroup">모임 만들기</button>
+    </div>
+    <div class="saved-list" id="groupList"></div>
+  </section>
+
+  <div class="group-name hidden" id="currentGroupName"></div>
+  <nav class="nav hidden" id="nav">
     <button data-view="lineup" class="on">라인업</button>
     <button data-view="matches">경기 기록</button>
     <button data-view="stats">선수 기록</button>
@@ -37,9 +48,13 @@
   <div id="banner" class="banner hidden"></div>
 
   <!-- ===== 라인업 ===== -->
-  <section id="vLineup">
+  <section id="vLineup" class="hidden">
     <div class="layout">
       <section class="card">
+        <div class="squad-actions">
+          <button class="btn outline" id="saveSquad">스쿼드 저장</button>
+          <button class="btn outline" id="loadSquad">스쿼드 불러오기</button>
+        </div>
         <div class="tabs" id="tabs"></div>
         <div class="ctrl-row">
           <div class="grp"><label>인원</label><select id="sizeSel" aria-label="한 팀 인원"></select></div>
@@ -74,12 +89,15 @@
 
       <aside class="side">
         <div class="card">
-          <h2>오늘 참가자 <span class="pill" id="total">0명</span></h2>
+          <div class="section-heading">
+            <h2>오늘 참가자 <span class="pill" id="total">0명</span></h2>
+            <button class="mini-btn" id="choosePlayers">명단에서 선택</button>
+          </div>
           <div class="add-row">
             <textarea id="nameInput" placeholder="이름 입력 후 Enter (쉼표·줄바꿈으로 여러 명)"></textarea>
             <button class="btn primary" id="addBtn">추가</button>
           </div>
-          <p class="sub">같은 이름은 같은 선수로 기록이 이어져요.</p>
+          <p class="sub">새로 추가한 선수는 이 모임 명단에 저장돼요.</p>
           <button class="shot-btn hidden" id="shotBtn"><span class="kk"><svg width="13" height="13" viewBox="0 0 24 24" fill="#3a1d1d"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.7 6.7l-1 3.6c-.1.4.3.7.6.5l4.3-2.8c.5.1.9.1 1.4.1 5.5 0 10-3.6 10-8S17.5 3 12 3z"/></svg></span>카톡 투표 캡처로 추가</button>
           <input type="file" id="shotFile" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
           <div class="past hidden" id="pastBox">
@@ -143,31 +161,19 @@
 
 <div class="loading" id="loading">기록 불러오는 중…</div>
 
-<div class="setup hidden" id="setup"><div class="panel">
-  <div class="logo"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><circle cx="12" cy="12" r="9.5"/><path d="M12 7.2l4 2.9-1.5 4.7h-5L8 10.1z" fill="#fff"/><path d="M12 2.5v4.7M16 10.1l4.8-1.4M14.5 14.8l2.9 4M9.5 14.8l-2.9 4M8 10.1L3.2 8.7"/></svg></div>
-  <h2>한 팀에 몇 명씩 뛰나요?</h2>
-  <p class="lead">골키퍼 포함 인원이에요</p>
-  <div class="num-wrap">
-    <input id="stNum" type="number" inputmode="numeric" min="3" max="11" placeholder="11" aria-label="한 팀 인원수">
-    <span>명</span>
-  </div>
-  <div class="vs" id="stVs"></div>
-  <input id="stTitle" class="title-in" placeholder="모임 이름 (선택, 예: 토요일 조기축구)" maxlength="60">
-  <button class="btn primary start" id="stStart">시작하기</button>
-  <button class="cancel" id="stCancel">취소</button>
-</div></div>
-
 <div class="toast" id="toast"></div>
 <div class="modal hidden" id="modal"><div class="box"><h3 id="mTitle"></h3><div id="mBody"></div><div class="m-actions" id="mActions"></div></div></div>
 
 <script src="js/utils.js"></script>
 <script src="js/store.js"></script>
 <script src="js/ui.js"></script>
-<script src="js/render.js"></script>
+<script src="js/render.js?v=5"></script>
 <script src="js/lineup.js"></script>
 <script src="js/matches.js"></script>
-<script src="js/stats.js"></script>
+<script src="js/stats.js?v=5"></script>
 <script src="js/setup.js"></script>
+<script src="js/groups.js"></script>
+<script src="js/squads.js"></script>
 <script src="js/ocr.js"></script>
 <script src="js/image.js"></script>
 <script src="js/app.js"></script>

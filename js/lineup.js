@@ -134,15 +134,15 @@ function addNames(){
   addNameList(names);
 }
 function addNameList(names){
-  const byName={};for(const id in roster)byName[roster[id].name]=id;
+  const byName=new Map(Object.entries(roster).map(([id,player])=>[player.name,id]));
   let added=0,dup=0;
   for(const n of names){
-    const nm=n.slice(0,20);let id=byName[nm];
-    if(!id){id=uid();roster[id]={name:nm,createdAt:Date.now()};byName[nm]=id;putPlayer(id)}
+    const nm=n.slice(0,20);let id=byName.get(nm);
+    if(!id){id=uid();roster[id]={name:nm,createdAt:Date.now()};byName.set(nm,id)}
     if(cur.attendees.includes(id)){dup++;continue}
     cur.attendees.push(id);added++;
   }
-  commit();
+  if(!commit()) return;
   if(dup&&!added) toast('이미 오늘 명단에 있어요');else if(added>1) toast(`${added}명 추가했어요`);
 }
 $('#addBtn').addEventListener('click',addNames);
@@ -175,9 +175,17 @@ $('#copyText').addEventListener('click',()=>{
   const fallback=()=>{openModal('명단 텍스트','<p>아래 내용을 길게 눌러 복사하세요.</p><textarea id="cpTa" readonly>'+esc(text)+'</textarea>',[{label:'닫기',primary:true}]);setTimeout(()=>{const t=$('#cpTa');t&&t.select()},50)};
   try{navigator.clipboard.writeText(text).then(()=>toast('단톡방에 붙여넣을 명단을 복사했어요'),fallback)}catch(e){fallback()}
 });
-$('#resetAll').addEventListener('click',()=>confirmBox('라인업 새로 짜기','오늘 참가자와 배치를 비우고 인원부터 다시 정할까요? 경기 기록과 선수 기록은 그대로 남아요.','새로 짜기',()=>{
-  const keep={};for(const k of keys())keep[k]={name:cur.teams[k].name,color:cur.teams[k].color};const tc=cur.teamCount;
-  cur=freshCurrent();cur.teamCount=tc;ensureTeams();for(const k in keep)Object.assign(cur.teams[k],keep[k]);sel=null;commit();openSetup(true)}));
+$('#resetAll').addEventListener('click',()=>confirmBox('라인업 새로 짜기','오늘 참가자와 배치를 비울까요?','새로 짜기',()=>{
+  for(const team of Object.values(cur.teams)){
+    for(const slot of team.slots) slot.pid=null;
+    team.subs=[];
+  }
+  cur.attendees=[];
+  cur.referee='';
+  delete cur.pastHidden;
+  sel=null;
+  commit();
+}));
 function lineupText(){
   const out=[];if(cur.title&&cur.title.trim()) out.push(cur.title.trim(),'');
   for(const k of keys()){

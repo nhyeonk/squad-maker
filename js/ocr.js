@@ -177,34 +177,39 @@ function parseOCR(lines){
   return {opts:opts.filter(o=>o.names.length),low,fixed};
 }
 async function readShots(files){
+  const group=activeGroup();
   files=files.slice(0,6);ocrCancel=false;
-  const setMsg=(h)=>{const el=$('#ocrMsg');if(el)el.innerHTML=h};
   openModal('캡처 읽는 중',`<div class="spin"></div><p style="text-align:center" id="ocrMsg">글자 인식 준비 중…</p><p class="sub" style="text-align:center">처음 한 번은 한국어 인식 데이터를 받느라 조금 더 걸려요.</p>`,
     [{label:'취소',fn:()=>{ocrCancel=true;if(TW){TW.terminate().catch(()=>{});TW=null}}}]);
+  const progress=$('#ocrMsg');
+  const stillReading=()=>!ocrCancel&&activeGroup()===group&&view==='lineup'&&$('#ocrMsg')===progress&&!$('#modal').classList.contains('hidden');
+  const setMsg=h=>{if(stillReading()) progress.innerHTML=h};
+  const onProgress=m=>{
+    const p=Math.round((m.progress||0)*100);
+    if(/core/.test(m.status))setMsg(`인식 엔진 불러오는 중… ${p}%`);
+    else if(/traineddata/.test(m.status))setMsg(`한국어 데이터 받는 중… ${p}%`);
+  };
   const all=[];
   try{
-    ocrProg=m=>{const p=Math.round((m.progress||0)*100);
-      if(/core/.test(m.status))setMsg(`인식 엔진 불러오는 중… ${p}%`);
-      else if(/traineddata/.test(m.status))setMsg(`한국어 데이터 받는 중… ${p}%`);
-      };
+    ocrProg=onProgress;
     const w=await getWorker();
     for(const f of files){
-      if(ocrCancel) return;
+      if(!stillReading()) return;
       const crops=await prepImage(f);
       for(let ci=0;ci<crops.length;ci++){
-        if(ocrCancel) return;
+        if(!stillReading()) return;
         setMsg(`글자 읽는 중 (${files.length>1?`${files.indexOf(f)+1}/${files.length}장, `:''}${ci+1}/${crops.length})…`);
         const {data}=await w.recognize(crops[ci]);
         all.push({text:String(data.text||'').replace(/\s*\n\s*/g,' ').trim(),confidence:data.confidence});
       }
     }
   }catch(e){
-    if(ocrCancel) return;
+    if(!stillReading()) return;
     closeModal();TW=null;
     const why=navigator.onLine===false?'처음 한 번은 인터넷이 연결돼 있어야 해요.':(!window.Tesseract?'글자 인식 엔진을 불러오지 못했어요. 인터넷 연결을 확인하거나, 카톡 안 브라우저라면 크롬·사파리로 열어 주세요.':'캡처를 읽는 중에 문제가 생겼어요.');
     openModal('캡처를 읽지 못했어요',`<p>${why}</p><p class="sub">오류 내용: ${esc(String(e&&(e.message||e)).slice(0,200))}</p>`,[{label:'확인',primary:true}]);return;
-  }finally{ocrProg=null}
-  if(ocrCancel) return;
+  }finally{if(ocrProg===onProgress) ocrProg=null}
+  if(!stillReading()) return;
   lastRaw=all.map(l=>l.text).filter(t=>String(t).trim()).join('\n');
   const {opts,low,fixed}=parseOCR(all);
   if(!opts.some(o=>o.names.length)){
@@ -218,7 +223,7 @@ function showShotResult(opts,title,low=new Set(),fixed={}){
   const yes=/참석|참가|가능|ㅇㅇ|갑니다|가요|콜|yes|o\b/i;
   let oi=Math.max(0,opts.findIndex(o=>o.names.length&&yes.test(o.label)));
   if(!opts[oi].names.length) oi=opts.findIndex(o=>o.names.length);
-  const byName={};for(const id in roster)byName[roster[id].name]=id;
+  const byName=Object.create(null);for(const id in roster)byName[roster[id].name]=id;
   const att=new Set(cur.attendees);
   let picked=new Set();
   const reset=()=>{picked=new Set(opts[oi].names.filter(n=>!(byName[n]&&att.has(byName[n]))&&!low.has(n)))};

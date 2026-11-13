@@ -13,5 +13,20 @@ function openModal(title,body,actions){
 }
 function closeModal(){$('#modal').classList.add('hidden');modalClick=null}
 function confirmBox(title,msg,okLabel,fn,danger){openModal(title,'<p>'+esc(msg)+'</p>',[{label:'취소'},{label:okLabel,primary:!danger,danger:!!danger,fn}])}
+function openNameDialog(title,label,value,action,save){
+  const submit=()=>{
+    const name=$('#itemName').value.trim().slice(0,60);
+    if(!name){toast('이름을 입력하세요');return false}
+    return save(name);
+  };
+  openModal(title,`<label class="modal-field">${esc(label)}<input class="name-in" id="itemName" maxlength="60" value="${esc(value)}"></label>`,
+    [{label:'취소'},{label:action,primary:true,fn:submit}]);
+  const input=$('#itemName');
+  input.focus();
+  input.select();
+  input.addEventListener('keydown',e=>{
+    if(e.key==='Enter'&&!e.isComposing&&submit()!==false) closeModal();
+  });
+}
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});
 $('#mBody').addEventListener('click',e=>{if(modalClick)modalClick(e)});

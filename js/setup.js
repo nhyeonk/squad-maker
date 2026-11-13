@@ -1,30 +1,6 @@
 /* 스쿼드 메이커 · setup.js
- * 처음 인원 정하기 화면
+ * 팀당 인원 변경
  */
-/* ================= setup ================= */
-let stN=null;
-function stRender(){
-  const raw=$('#stNum').value.trim();const n=Number(raw);const vs=$('#stVs');
-  if(raw===''){stN=null;vs.className='vs';vs.textContent=`${MIN}~${MAX}명 사이로 입력하세요`}
-  else if(!Number.isInteger(n)||n<MIN||n>MAX){stN=null;vs.className='vs err';vs.textContent=`${MIN}명부터 ${MAX}명까지만 가능해요`}
-  else{stN=n;vs.className='vs';vs.textContent=`${n} vs ${n} · 총 ${n*2}명 필요`}
-  $('#stStart').disabled=stN===null;
-}
-function openSetup(first){
-  $('#stNum').value=first?'':cur.size;$('#stTitle').value=cur.title||'';
-  $('#stCancel').style.display=first?'none':'';
-  stRender();$('#setup').classList.remove('hidden');
-  setTimeout(()=>{try{$('#stNum').focus()}catch(e){}},50);
-}
-$('#stNum').addEventListener('input',stRender);
-$('#stNum').addEventListener('keydown',e=>{if(e.key==='Enter'&&stN!==null)$('#stStart').click()});
-$('#stCancel').addEventListener('click',()=>$('#setup').classList.add('hidden'));
-$('#stStart').addEventListener('click',()=>{
-  if(stN===null) return;
-  if(stN!==cur.size||!cur.started){cur.size=stN;for(const k of TK)if(cur.teams[k])remap(cur.teams[k],FORMATIONS[stN][0])}ensureTeams();
-  cur.title=$('#stTitle').value.trim();cur.started=true;sel=null;
-  $('#setup').classList.add('hidden');view='lineup';commit();
-});
 function fname(t){return FORMATIONS[cur.size].includes(t.formation)?t.formation:'직접 배치'}
 function resizeTeam(t,n){
   const sl=t.slots;let out=0;

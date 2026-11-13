@@ -74,7 +74,9 @@ function drawAll(){
   return c;
 }
 async function openImage(){
+  const group=activeGroup();
   try{await document.fonts.ready}catch(e){}
+  if(activeGroup()!==group||view!=='lineup') return;
   let mode=cur.teamCount>1?'all':'one';
   const make=()=>{const c=mode==='all'?drawAll():drawTeam(cur.active);return c};
   let canvas=make();

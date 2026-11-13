@@ -3,14 +3,23 @@
  */
 /* ================= render ================= */
 function renderAll(){
-  computeStats();
+  const inGroups=view==='groups';
+  $('#vGroups').classList.toggle('hidden',!inGroups);
+  $('#groupsBtn').classList.toggle('hidden',inGroups);
+  $('#nav').classList.toggle('hidden',inGroups);
+  $('#currentGroupName').classList.toggle('hidden',inGroups);
+  $('#currentGroupName').textContent=activeGroup()?.name||'';
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.view===view));
   $('#vLineup').classList.toggle('hidden',view!=='lineup');
   $('#vMatches').classList.toggle('hidden',view!=='matches');
   $('#vStats').classList.toggle('hidden',view!=='stats');
-  renderLineup();
-  if(view==='matches') renderMatches();
-  if(view==='stats') renderStats();
+  if(inGroups) renderGroups();
+  else{
+    computeStats();
+    if(view==='lineup') renderLineup();
+    if(view==='matches') renderMatches();
+    if(view==='stats') renderStats();
+  }
   $('#foot').textContent='기록은 이 폰(브라우저)에만 저장돼요. 폰을 바꾸거나 다른 사람에게 넘길 땐 백업 파일을 쓰세요.';
 }
 function showBanner(){
@@ -20,13 +29,20 @@ function showBanner(){
 }
 
 /* ---------- lineup ---------- */
+function tierBadge(id){
+  const tier=roster[id]?.tier;
+  return TIERS.includes(tier)?`<span class="tier-badge tier-${tier}" title="${tier} 티어" aria-label="${tier} 티어">${tier}</span>`:'';
+}
+
 function renderLineup(){
   const t=T();
+  $('#choosePlayers').disabled=!Object.keys(roster).length;
+  $('#loadSquad').disabled=!activeGroup().squads.length;
   $('#tabs').innerHTML=keys().map(k=>{const tm=cur.teams[k];const c=tm.slots.filter(s=>s.pid).length;const sb=subsOf(tm).length;
     return `<button class="tab ${cur.active===k?'on':''}" data-team="${k}"><span class="dot" style="background:${tm.color}"></span>${esc(tm.name)}<span class="cnt">${c}/${cur.size}${sb?` +${sb}`:''}</span></button>`}).join('');
   const subs=subsOf(t);
   $('#subs').innerHTML=`<div class="subs-h">후보 <span style="opacity:.7">${subs.length}</span></div><div class="subs-list">`+
-    subs.map((p,i)=>`<div class="sbs ${sel&&sel.kind==='sub'&&sel.idx===i?'sel':''}" data-sub="${i}" style="--tc:${t.color}"><span class="tag">SUB</span><span class="sn">${esc(pname(p))}</span></div>`).join('')+
+    subs.map((p,i)=>`<div class="sbs ${sel&&sel.kind==='sub'&&sel.idx===i?'sel':''}" data-sub="${i}" style="--tc:${t.color}"><span class="tag">SUB</span>${tierBadge(p)}<span class="sn">${esc(pname(p))}</span></div>`).join('')+
     (subs.length<12?`<div class="sbs empty ${sel&&sel.kind==='sub'&&sel.idx===subs.length?'sel':''}" data-sub="${subs.length}">+ 후보</div>`:'')+'</div>';
   $('#sizeSel').innerHTML=Array.from({length:MAX-MIN+1},(_,i)=>MIN+i).map(n=>`<option value="${n}" ${n===cur.size?'selected':''}>${n} vs ${n}</option>`).join('');
   const custom=!FORMATIONS[cur.size].includes(t.formation);
@@ -41,7 +57,7 @@ function renderLineup(){
     const P=posOf(s);
     const st=filled?`background:${POSCOL[P.cat]};color:${textOn(POSCOL[P.cat])}`:'';
     return `<div class="slot ${filled?'filled':''} ${isSel?'sel':''}" data-slot="${i}" style="left:${s.x}%;top:${s.y}%;--pc:${POSCOL[P.cat]};--tc:${t.color}">
-      <div class="disc" style="${st}">${P.code}${g?`<span class="gb" title="통산 ${g}골">${g}</span>`:''}</div><div class="nm">${filled?esc(pname(s.pid)):''}</div></div>`}).join('');
+      <div class="disc" style="${st}">${P.code}${filled?tierBadge(s.pid):''}${g?`<span class="gb" title="통산 ${g}골">${g}</span>`:''}</div><div class="nm">${filled?esc(pname(s.pid)):''}</div></div>`}).join('');
 
   const b=bench();
   const att=cur.attendees.filter(id=>roster[id]);
@@ -49,9 +65,9 @@ function renderLineup(){
   $('#total').textContent=att.length+'명';
   const taken=att.filter(id=>!b.includes(id));
   const free=b.map(id=>{const g=goalsOf(id);
-    return `<div class="chip ${sel&&sel.kind==='bench'&&sel.pid===id?'sel':''}" data-pid="${id}"><span>${esc(pname(id))}</span>${g?`<span class="cg">${BALL}${g}</span>`:''}<button class="x" data-del="${id}" aria-label="오늘 명단에서 빼기">×</button></div>`}).join('');
+    return `<div class="chip ${sel&&sel.kind==='bench'&&sel.pid===id?'sel':''}" data-pid="${id}">${tierBadge(id)}<span>${esc(pname(id))}</span>${g?`<span class="cg">${BALL}${g}</span>`:''}<button class="x" data-del="${id}" aria-label="오늘 명단에서 빼기">×</button></div>`}).join('');
   const tk=taken.map(id=>{const w=whereIs(id);const tm=cur.teams[w.k];
-    return `<div class="chip taken" data-taken="${id}" title="${esc(tm.name)} ${w.code}"><span class="dot" style="background:${tm.color}"></span><span>${esc(pname(id))}</span><span class="tk">${w.code}</span></div>`}).join('');
+    return `<div class="chip taken" data-taken="${id}" title="${esc(tm.name)} ${w.code}"><span class="dot" style="background:${tm.color}"></span>${tierBadge(id)}<span>${esc(pname(id))}</span><span class="tk">${w.code}</span></div>`}).join('');
   $('#benchList').innerHTML=att.length?(free||'<p class="empty" style="width:100%;margin:0 2px 4px">모든 참가자가 배치됐어요.</p>')+tk
     :'<p class="empty">먼저 위에서 참가자 이름을 추가하세요.</p>';
 

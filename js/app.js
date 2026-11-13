@@ -14,7 +14,7 @@ $('#installBtn').addEventListener('click',async()=>{
     :'<p>브라우저 메뉴(⋮)에서 <b>앱 설치</b> 또는 <b>홈 화면에 추가</b>를 누르세요.</p><p>카톡 안에서 열었다면 오른쪽 위 메뉴에서 <b>다른 브라우저로 열기</b>를 먼저 눌러 주세요.</p>',[{label:'확인',primary:true}]);
 });
 $('#backupOut').addEventListener('click',async()=>{
-  const data=JSON.stringify({app:'squadmaker',v:2,savedAt:new Date().toISOString(),roster,matches,cur},null,1);
+  const data=JSON.stringify({app:'squadmaker',savedAt:new Date().toISOString(),...appData()},null,1);
   const blob=new Blob([data],{type:'application/json'});const name=`스쿼드메이커_백업_${today()}.json`;
   if(!(await shareFile(blob,name,'스쿼드 메이커 백업')))saveBlobFile(blob,name);
 });
@@ -22,27 +22,29 @@ $('#backupIn').addEventListener('click',()=>$('#backupFile').click());
 $('#backupFile').addEventListener('change',e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
   f.text().then(t=>{let d;try{d=JSON.parse(t)}catch(err){toast('백업 파일을 읽을 수 없어요');return}
-    if(!d||d.app!=='squadmaker'||!d.roster||!d.matches){toast('스쿼드 메이커 백업 파일이 아니에요');return}
-    const n=Object.keys(d.matches).length,pn=Object.keys(d.roster).length;
-    confirmBox('백업 불러오기',`선수 ${pn}명, 경기 ${n}개가 들어 있어요. 지금 이 폰의 기록을 백업 내용으로 바꿀까요?`,'불러오기',()=>{
-      roster=d.roster;matches=d.matches;cur=normalizeCur(d.cur||freshCurrent());sel=null;openMatch=null;saveLocal();renderAll();toast('백업을 불러왔어요')},true);
-  });
+    const restored=d?.app==='squadmaker'?readAppData(d):null;
+    if(!restored){toast('스쿼드 메이커 백업 파일이 아니에요');return}
+    const entries=Object.values(restored.groups);
+    const players=entries.reduce((sum,group)=>sum+Object.keys(group.roster).length,0);
+    const games=entries.reduce((sum,group)=>sum+Object.keys(group.matches).length,0);
+    confirmBox('백업 불러오기',`모임 ${entries.length}개, 선수 ${players}명, 경기 ${games}개가 들어 있어요. 지금 이 폰의 기록을 백업 내용으로 바꿀까요?`,'불러오기',()=>{
+      if(!writeLocal(restored)) return false;
+      useAppData(restored);
+      renderAll();
+      toast('백업을 불러왔어요');
+    },true);
+  }).catch(()=>toast('백업 파일을 읽을 수 없어요'));
 });
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 
 /* ================= boot ================= */
-function normalizeCur(c){
-  if(!c||!c.teams||!c.teams.A||!c.teams.B) return freshCurrent();
-  c=clone(c);if(!FORMATIONS[c.size])c.size=11;if(!Array.isArray(c.attendees))c.attendees=[];c.teamCount=Number.isInteger(c.teamCount)&&c.teamCount>=1&&c.teamCount<=MAXT?c.teamCount:2;const save=cur;cur=c;ensureTeams();cur=save;
-  return c;
-}
 function finishLoad(){
   if(loaded) return;loaded=true;
   $('#loading').classList.add('hidden');showBanner();renderAll();
-  if(!cur.started) openSetup(true);
 }
 function boot(){
-  loadLocal();cur=normalizeCur(cur);finishLoad();
+  useAppData(loadLocal());
+  finishLoad();
 }
 function isTyping(){const a=document.activeElement;return a&&(a.id==='mdTitle'||a.id==='mdRef'||a.id==='rnIn'||a.id==='refIn')}
 boot();
