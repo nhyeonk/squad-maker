@@ -28,7 +28,7 @@ export function lineupText() {
 }
 
 /* ---------- 스쿼드 이미지 (canvas) ----------
- * mode: "team" = 지금 보는 팀만, "all" = 선수가 있는 모든 팀을 나란히
+ * mode: "t0", "t1" … = 그 팀만, "all" = 선수가 있는 모든 팀을 나란히
  */
 const FONT = "'Pretendard Variable',Pretendard,'Apple SD Gothic Neo','Noto Sans KR',sans-serif";
 const font = (w, px) => `${w} ${px}px ${FONT}`;
@@ -200,7 +200,7 @@ function badgeNumber(st, pid) {
 /** 이미지에 들어갈 팀 목록 */
 export function imageTeams(mode) {
   const l = lineup();
-  if (mode === "team") return [S.ui.team];
+  if (/^t\d+$/.test(mode)) return [Math.min(+mode.slice(1), l.teams.length - 1)];
   const withPlayers = l.teams.map((T, i) => (teamPlayers(T).filter(P).length ? i : -1)).filter((i) => i >= 0);
   return withPlayers.length ? withPlayers : l.teams.map((_, i) => i);
 }
@@ -221,7 +221,7 @@ export function renderSquadCanvas(mode, st) {
 }
 
 const toBlob = (cv) => new Promise((r) => cv.toBlob(r, "image/png"));
-const fileName = (mode) => `squad-${mode === "team" ? lineup().teams[S.ui.team].name : "all"}-${todayStr()}.png`;
+const fileName = (mode) => `squad-${mode === "all" ? "all" : lineup().teams[imageTeams(mode)[0]].name}-${todayStr()}.png`;
 
 export async function saveCanvasImage(cv, mode) {
   const blob = await toBlob(cv);

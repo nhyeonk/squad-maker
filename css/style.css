@@ -224,3 +224,12 @@ details.others summary{font-size:12.5px;color:var(--sub);font-weight:700;cursor:
 .modal.wide{max-width:760px}
 .imgprev{background:#e9e5dc;border:1px solid var(--line);border-radius:12px;padding:8px;max-height:62vh;overflow:auto;text-align:center}
 .imgprev img{max-width:100%;max-height:58vh;border-radius:6px;display:inline-block}
+.imgseg{display:flex;flex-wrap:wrap}
+.imgseg button{display:inline-flex;align-items:center}
+/* 여러 명 삭제 */
+.bulkbar{position:sticky;top:62px;z-index:15;display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:#1d1d1b;color:#fff;border-radius:12px;padding:8px 8px 8px 14px;margin-bottom:10px;font-size:14px}
+.bulkbar .sp{flex:1}
+.bulkbar .btn.ghost{background:rgba(255,255,255,.12);color:#fff;border:0}
+.ck{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:7px;border:2px solid var(--line);font-size:13px;font-weight:900;color:#fff;background:#fff}
+.ck.on{background:#e5484d;border-color:#e5484d}
+.tb tr.picked td{background:#fff3f3}

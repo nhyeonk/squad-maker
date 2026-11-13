@@ -276,17 +276,20 @@ export function openPosPicker(slotIdx) {
 }
 
 /* ---------- 스쿼드 이미지 미리보기 ---------- */
-export function openImage(mode = S.ui.imgMode || "team") {
-  S.ui.imgMode = mode;
+export function openImage(mode) {
   const l = lineup();
-  const T = l.teams[S.ui.team];
+  // 기본: 지금 보고 있는 팀
+  if (!mode) mode = S.ui.imgMode && (S.ui.imgMode === "all" || +S.ui.imgMode.slice(1) < l.teams.length) ? S.ui.imgMode : "t" + S.ui.team;
+  S.ui.imgMode = mode;
   const nTeams = l.teams.filter((x) => teamPlayers(x).filter(P).length).length || l.teams.length;
+  const teamBtns = l.teams
+    .map((T, i) => `<button class="${mode === "t" + i ? "on" : ""}" data-act="imgmode" data-v="t${i}"><span class="dot" style="background:${T.color};margin-right:5px"></span>${esc(T.name)}</button>`)
+    .join("");
   const st = S.ui.badge === "none" ? {} : computeStats().st;
   const cv = renderSquadCanvas(mode, st);
   S.ui.imgCanvas = cv;
   openModal(`<h2>스쿼드 이미지${closeBtn}</h2>
-    <div class="seg" style="margin-bottom:12px">
-      <button class="${mode === "team" ? "on" : ""}" data-act="imgmode" data-v="team">${esc(T.name)}만</button>
+    <div class="seg imgseg" style="margin-bottom:12px">${teamBtns}
       <button class="${mode === "all" ? "on" : ""}" data-act="imgmode" data-v="all">전체 ${nTeams}팀</button></div>
     <div class="imgprev"><img src="${cv.toDataURL("image/png")}" alt="스쿼드 이미지 미리보기"></div>
     <div class="row" style="justify-content:flex-end;margin-top:12px;flex-wrap:wrap">

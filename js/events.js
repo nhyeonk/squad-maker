@@ -24,13 +24,14 @@ function commitLineup() {
 const EDIT_ONLY = new Set([
   "tobench", "toteam", "topool", "attend", "unattend", "split", "fill", "clearteam", "resetall", "addteam", "delteam",
   "autoplace", "startmatch", "newmatch", "goal", "delgoal", "mstatus", "delmatch", "mrmplayer", "maddplayer",
-  "posopen", "posset", "posreset", "ppos", "pskill", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply", "pregular", "attendregulars", "rostertoggle",
+  "posopen", "posset", "posreset", "bulkstart", "bulkdelete", "ppos", "pskill", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply", "pregular", "attendregulars", "rostertoggle",
 ]);
 
 const actions = {
   /* ----- 공통 ----- */
   tab(v) {
     S.ui.tab = v;
+    S.ui.bulk = false;
     S.ui.sel = null;
     if (v !== "matches") S.ui.matchId = null;
     render();
@@ -359,6 +360,48 @@ const actions = {
     await api.delPlayer(v);
     M.closeModal();
     render();
+  },
+  /* ----- 선수 여러 명 삭제 ----- */
+  bulkstart() {
+    S.ui.bulk = true;
+    S.ui.bulkSel = [];
+    render();
+  },
+  bulkcancel() {
+    S.ui.bulk = false;
+    S.ui.bulkSel = [];
+    render();
+  },
+  bulktoggle(v) {
+    const sel = new Set(S.ui.bulkSel);
+    sel.has(v) ? sel.delete(v) : sel.add(v);
+    S.ui.bulkSel = [...sel];
+    render();
+  },
+  bulkall() {
+    const all = Object.keys(S.players);
+    S.ui.bulkSel = S.ui.bulkSel.length === all.length ? [] : all;
+    render();
+  },
+  async bulkdelete() {
+    const ids = S.ui.bulkSel.filter((id) => P(id));
+    if (!ids.length) return;
+    const used = ids.filter((id) => Object.values(S.matches).some((m) => m.teams.some((T) => (T.players || []).includes(id))));
+    const names = ids.slice(0, 5).map((id) => P(id).name).join(", ") + (ids.length > 5 ? ` 외 ${ids.length - 5}명` : "");
+    let msg = `${names}\n\n${ids.length}명을 삭제할까요? 되돌릴 수 없어요.`;
+    if (used.length) msg += `\n(${used.length}명은 경기 기록에 있어서, 기록에는 '(삭제됨)'으로 보여요)`;
+    if (!confirm(msg)) return;
+    const l = lineup();
+    ids.forEach((id) => {
+      removeFrom(locate(id), id);
+      l.attendees = l.attendees.filter((x) => x !== id);
+    });
+    api.putLineup();
+    await Promise.all(ids.map((id) => api.delPlayer(id)));
+    S.ui.bulk = false;
+    S.ui.bulkSel = [];
+    render();
+    toast(`${ids.length}명 삭제했어요`);
   },
   sort(v) {
     S.ui.sort = v;

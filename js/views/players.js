@@ -39,6 +39,8 @@ export function viewPlayers() {
 
   let rank = 0, prev = null;
   const hl = (k, v) => (key === k && v ? "hl" : "");
+  const bulk = S.ui.bulk && S.canEdit;
+  const picked = new Set(S.ui.bulkSel || []);
   const tr = rows
     .map((s, i) => {
       const v = val(s);
@@ -46,8 +48,9 @@ export function viewPlayers() {
       const rp = recommendedPos(s.id, s);
       const dec = s.w + s.d + s.l;
       const prefs = (P(s.id).pos || []).map((r) => `<span class="pb ${r}" style="margin:0 1px">${r}</span>`).join("");
-      return `<tr class="click" data-act="info" data-v="${s.id}">
-        <td>${s.apps ? rank : ""}</td><td class="nm">${esc(pname(s.id))}${P(s.id).regular ? " ⭐" : ""}</td>
+      const first = bulk ? `<span class="ck ${picked.has(s.id) ? "on" : ""}">${picked.has(s.id) ? "✓" : ""}</span>` : s.apps ? rank : "";
+      return `<tr class="click ${bulk && picked.has(s.id) ? "picked" : ""}" data-act="${bulk ? "bulktoggle" : "info"}" data-v="${s.id}">
+        <td>${first}</td><td class="nm">${esc(pname(s.id))}${P(s.id).regular ? " ⭐" : ""}</td>
         <td>${rp ? `<span class="pb ${rp}" style="font-size:11px;padding:2px 7px">${POS_KO[rp]}</span>` : "-"}</td>
         <td>${prefs || `<span style="color:var(--mute)">-</span>`}</td>
         <td>${s.apps || "-"}</td><td>${dec ? `${s.w}-${s.d}-${s.l}` : "-"}</td><td>${dec ? Math.round((s.w / dec) * 100) + "%" : "-"}</td>
@@ -65,7 +68,11 @@ export function viewPlayers() {
       <div class="stat"><b>${goals}</b><span>골</span></div>
       <div class="stat"><b>${Object.keys(S.players).length}</b><span>선수</span></div></div>
     <div class="row" style="flex-wrap:wrap;margin-bottom:10px">${seg(SORTS, key, "sort")}${seg(PERIODS, S.ui.period, "period")}<span style="flex:1"></span>
-      <button class="btn sm pri" data-act="newplayer" data-edit>+ 선수 추가</button></div>
+      ${bulk ? "" : `<button class="btn sm" data-act="bulkstart" data-edit>여러 명 삭제</button><button class="btn sm pri" data-act="newplayer" data-edit>+ 선수 추가</button>`}</div>
+    ${bulk ? `<div class="bulkbar"><span><b>${picked.size}명</b> 선택</span><span class="sp"></span>
+      <button class="btn sm ghost" data-act="bulkall">${picked.size === rows.length ? "선택 해제" : "전체 선택"}</button>
+      <button class="btn sm ghost" data-act="bulkcancel">취소</button>
+      <button class="btn sm red" data-act="bulkdelete" ${picked.size ? "" : "disabled"}>${picked.size}명 삭제</button></div>` : ""}
     ${rows.length
       ? `<div class="tbw"><table class="tb"><thead><tr><th>#</th><th>이름</th><th>추천 포지션</th><th>선호</th><th>경기</th><th>승-무-패</th><th>승률</th><th>골</th><th>도움</th><th>공격P</th></tr></thead><tbody>${tr}</tbody></table></div>`
       : `<div class="card empty">아직 선수가 없어요.</div>`}
