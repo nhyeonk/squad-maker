@@ -1,90 +1,110 @@
 # ⚽ 스쿼드 메이커
 
-동네축구·풋살 라인업 짜기, 경기 기록, 선수 기록을 위한 웹앱(PWA)이에요.
-링크를 받은 사람은 폰에 앱처럼 설치해서 쓸 수 있어요. 빌드 과정이나 서버가 필요 없는 순수 HTML·CSS·자바스크립트예요.
+동네 축구·풋살 모임용 **라인업 짜기 · 팀 나누기 · 경기 기록** 웹앱입니다.
+한 명(기록자)이 입력하면 친구들은 링크만 열어 실시간으로 볼 수 있고, 폰 홈 화면에 설치하면 앱처럼 쓸 수 있어요.
 
 ## 주요 기능
-- 인원(3~11명)·포메이션 선택, 경기장에 끌어다 놓기로 배치
-- 위치에 따라 포지션 자동 판정 (ST, CAM, LCB, SW 등) + 포지션 색 (공격 빨강 · 미드 초록 · 수비 파랑 · GK 노랑)
-- 팀 최대 8개 (풋살 밀어내기), 팀별 후보, 모든 팀 공통 심판
-- 이미지 캡처에서 참가자 이름 읽기 (Tesseract.js, 폰 안에서 처리)
-- 경기 기록: 스코어, 득점·도움, 심판, 출전 선수
-- 선수 기록: 출전·승무패·골·도움, 추천 포지션
-- 스쿼드 이미지 저장·공유, 명단 텍스트 복사
-- 백업 파일 저장/불러오기, 오프라인 사용
+
+- **라인업**: 3 vs 3 ~ 11 vs 11, 인원별 포메이션, 풋살 코트(6인 이하)
+- **팀 나누기**: 실력(★1~5)과 선호 포지션을 보고 2~6팀으로 자동 분배
+  - 나눈 뒤에도 선수를 눌러 **다른 팀으로 이동**하거나 **두 선수 맞교환** 가능
+  - 빈자리 채우기, 후보, 대기 명단
+- **선호 포지션**: 골키퍼/수비/미드/공격 중 여러 개, 누른 순서가 우선순위
+- **경기 기록**: 골·도움·자책골, 출전 선수, 심판, 진행 중/종료
+- **선수 기록**: 득점·도움·공격포인트·출전·승률 순위, 기간(전체/올해/이번 달), 추천 포지션
+- **공유**: 스쿼드 이미지 저장(카톡 공유), 명단 텍스트 복사, 카톡 투표 결과 붙여넣기로 참가자 추가
+- **저장**: Firebase(실시간 공유) 또는 폰에만 저장, 백업 파일 내보내기/불러오기
 
 ## 폴더 구조
+
 ```
-index.html            화면 구조(HTML)만 들어 있어요
-css/style.css         디자인 전체
-js/                   기능별 자바스크립트 (아래 순서대로 불러와요)
-  utils.js            상수·도우미: 포메이션 목록, 팀 색, 포지션 판정(posOf), 날짜·글자 도우미
-  store.js            데이터 상태와 저장(localStorage), 계산용 함수
-  ui.js               알림(toast)·팝업(modal)
-  render.js           라인업 화면 그리기 (경기장·후보·대기 명단·팀 명단)
-  lineup.js           배치·자리 바꾸기·끌어서 놓기, 참가자 추가, 랜덤 나누기,
-                      팀 추가/삭제, 인원 변경, 경기 시작
-  matches.js          경기 기록 목록·상세, 골·심판·출전 선수
-  stats.js            선수 기록, 추천 포지션, 여러 명 삭제, 이름 바꾸기
-  setup.js            처음 인원 정하기 화면
-  ocr.js              카톡 투표 캡처 → 이름 인식 (Tesseract.js)
-  image.js            스쿼드 이미지 그리기·저장·공유
-  app.js              앱 설치 안내, 백업, 시작(boot) ← 반드시 마지막
-sw.js                 오프라인 지원(서비스 워커)
-manifest.webmanifest  앱 이름·아이콘·색 (설치용)
-icons/                앱 아이콘
-```
-
-> **js 파일들은 모듈이 아니라 순서대로 불러오는 일반 스크립트예요.** 한 파일에서 만든 변수·함수를 다른 파일에서 그대로 쓸 수 있어요.
-> 파일을 새로 만들면 `index.html` 아래쪽 `<script>` 목록과 `sw.js`의 `SHELL` 목록에 둘 다 추가하세요. `app.js`는 항상 마지막이에요.
-
-## 자주 고칠 곳
-| 바꾸고 싶은 것 | 파일 · 위치 |
-|---|---|
-| 포메이션 목록 | `js/utils.js` → `FORMATIONS` |
-| 팀 색 순서 | `js/utils.js` → `COLORS` |
-| 포지션 판정 구역 (어디부터 CB/CDM/ST인지) | `js/utils.js` → `posOf()` |
-| 포지션 색 | `js/utils.js` → `POSCOL` |
-| 캡처 인식에서 걸러낼 단어 | `js/ocr.js` → `UI_RE`, 투표 항목 단어는 `OPT_RE` |
-| 스쿼드 이미지 모양 | `js/image.js` → `drawTeam()` |
-| 색·글꼴·간격 | `css/style.css` 맨 위 `:root` |
-
-## 내 컴퓨터에서 실행
-서비스 워커와 설치 기능 때문에 파일을 더블클릭하지 말고 간단한 서버로 여세요.
-```bash
-python3 -m http.server 8000
-# 브라우저에서 http://localhost:8000
+├── index.html            # 화면 뼈대
+├── css/style.css         # 디자인
+├── js/
+│   ├── main.js           # 시작점
+│   ├── config.js         # ★ Firebase 설정 넣는 곳
+│   ├── state.js          # 앱 상태와 데이터 구조
+│   ├── store.js          # 저장소 (로컬 / Firebase 실시간)
+│   ├── formations.js     # 인원별 포메이션, 자리 좌표
+│   ├── players.js        # 선수 추가, 이름 붙여넣기 처리, 포지션 적합도
+│   ├── lineup.js         # 선수 이동·교체, 자동 배치, 밸런스 팀 나누기
+│   ├── matches.js        # 경기 생성·골 기록
+│   ├── stats.js          # 선수별 통계
+│   ├── share.js          # 이미지·텍스트·백업
+│   ├── render.js         # 화면 그리기
+│   ├── events.js         # 버튼/입력 이벤트 (data-act → actions)
+│   └── views/            # 탭별 화면 HTML
+│       ├── lineup.js  matches.js  players.js  modals.js  common.js
+├── sw.js                 # 오프라인 캐시 (PWA)
+├── manifest.webmanifest  # 홈 화면 설치 정보
+├── icons/                # 앱 아이콘
+└── firestore.rules       # Firebase 보안 규칙
 ```
 
-## GitHub Pages로 올리기
-1. 이 폴더 내용을 저장소 맨 위(root)에 올려요.
-2. 저장소 **Settings → Pages** → Source를 `Deploy from a branch`, 브랜치 `main` / 폴더 `/ (root)`로 저장해요.
-3. 몇 분 뒤 `https://<아이디>.github.io/<저장소이름>/` 주소가 생겨요. 이 링크를 단톡방에 보내면 돼요.
+빌드 도구 없이 순수 HTML/CSS/JS(ES 모듈)라서 파일을 고치고 올리면 바로 반영돼요.
 
-**고친 뒤 배포할 때**: 커밋·푸시하면 자동으로 반영돼요. 설치한 사람도 다음에 앱을 열 때 새 버전을 받아요.
-화면이 예전 그대로면 `sw.js` 맨 위 `VERSION` 값을 올려 주세요 (예: `squadmaker-v3`).
+## 1. 깃허브 Pages로 배포하기
 
-## 폰에 설치하기 (링크 받은 사람)
-- 카톡에서 링크를 열면 카톡 안 브라우저라 설치가 안 돼요. 먼저 **Safari로 열기 / 다른 브라우저로 열기**를 누르세요.
-- **안드로이드(크롬)**: 화면 위 **앱 설치** 버튼, 또는 메뉴(⋮) → 앱 설치
-- **아이폰(사파리)**: 공유 버튼 → **홈 화면에 추가**
+1. 깃허브에 새 저장소를 만들고 이 폴더의 파일을 모두 올립니다.
+   ```bash
+   git init
+   git add .
+   git commit -m "스쿼드 메이커 첫 버전"
+   git branch -M main
+   git remote add origin https://github.com/<내 아이디>/squad-maker.git
+   git push -u origin main
+   ```
+2. 저장소 → **Settings → Pages** → Source: `Deploy from a branch`, Branch: `main` / `/ (root)` → Save
+3. 1~2분 뒤 `https://<내 아이디>.github.io/squad-maker/` 주소로 열려요.
 
-## 데이터 저장
-- 모든 기록은 각 폰의 브라우저 저장소(`localStorage`, 키 `squadmaker.v2`)에 있어요. 서버로 보내지 않아요.
-- 폰을 바꾸거나 기록을 넘길 땐 화면 맨 아래 **백업 파일 저장 → 백업 불러오기**를 쓰세요.
-- 아이폰은 앱을 몇 주 안 열면 저장소가 정리될 수 있어요. 가끔 백업하세요.
-- 여러 사람이 같은 기록을 보게 하려면 Firebase 같은 서버를 붙이면 돼요. 저장은 `js/store.js`의 `putCurrent / putPlayer / putMatch / delPlayerDoc / delMatchDoc`에서만 일어나서, 이 함수들과 `js/app.js`의 `boot()`만 바꾸면 돼요.
+> 로컬에서 테스트할 때는 파일을 더블클릭하지 말고 간단한 서버로 여세요 (ES 모듈은 `file://`에서 안 돼요).
+> `python3 -m http.server 8000` → http://localhost:8000
 
-### 저장 형식 (요약)
-```js
-roster  = { [선수id]: { name, createdAt } }
-matches = { [경기id]: { date, title, size, referee, finished, createdAt,
-            teams: { A: { name, color, formation, players:[선수id], pos:{[선수id]:'GK'|'DF'|'MF'|'FW'|'SUB'} }, B: {...} },
-            goals: [{ id, team:'A'|'B', scorer, assist, og, ts }] } }
-cur     = { size, title, referee, active, teamCount, attendees:[선수id],
-            teams: { A: { name, color, formation, slots:[{x,y,pid}], subs:[선수id] }, ... } }
+이 상태로도 바로 쓸 수 있어요. 다만 기록이 **각자 폰에만** 저장돼요. 친구들과 같이 보려면 2번을 하세요.
+
+## 2. Firebase 연결 (친구들과 실시간 공유) — 약 5분
+
+1. [Firebase 콘솔](https://console.firebase.google.com)에서 **프로젝트 추가** (구글 애널리틱스는 꺼도 돼요)
+2. **빌드 → Firestore Database → 데이터베이스 만들기** → 위치 `asia-northeast3 (서울)` → **프로덕션 모드**
+3. **규칙** 탭에 이 저장소의 `firestore.rules` 내용을 붙여넣고, `recorder@example.com`을 기록자 이메일로 바꾼 뒤 **게시**
+4. **빌드 → Authentication → 시작하기 → 로그인 방법: 이메일/비밀번호** 사용 설정
+5. **Authentication → Users → 사용자 추가**로 기록자 계정(3번에 적은 이메일 + 비밀번호)을 만들기
+6. **프로젝트 설정(⚙️) → 일반 → 내 앱 → 웹(</>)** 으로 앱 등록 → 나오는 `firebaseConfig`를 복사
+7. 연결 방법은 둘 중 하나:
+   - **(추천) 코드에 넣기**: `js/config.js`의 `FIREBASE_CONFIG = null`을 복사한 값으로 바꾸고 커밋·푸시.
+     그러면 사이트 주소만 공유해도 모두 자동 연결돼요.
+   - **앱에서 붙여넣기**: 앱의 ⚙️ 설정 → 붙여넣기 → 연결하기 → **공유 링크 복사**로 만든 링크를 단톡방에 공유
+8. 기록자는 ⚙️ 설정에서 5번 계정으로 로그인하면 입력할 수 있어요. 나머지 사람은 **보기 전용**이에요.
+
+> Firebase 웹 설정값(apiKey 등)은 비밀번호가 아니라 깃허브에 올려도 괜찮아요. 쓰기 권한은 `firestore.rules`가 막아줘요.
+> 무료 요금제(Spark)로 동네 모임 규모는 충분해요.
+
+**기존에 폰에 저장해 둔 기록**은 기록자로 로그인한 뒤 ⚙️ 설정 → "이 폰에 저장된 기록을 서버로 합치기"로 올릴 수 있어요.
+
+## 3. 폰에 앱으로 설치
+
+- **아이폰(사파리)**: 공유 버튼 → 홈 화면에 추가
+- **안드로이드(크롬)**: 메뉴(⋮) → 앱 설치 / 홈 화면에 추가
+
+## 데이터 구조 (Firestore)
+
+```
+groups/{그룹ID}/players/{선수ID}   { name, pos: ["MF","FW"], skill: 3 }
+groups/{그룹ID}/matches/{경기ID}   { date, title, referee, status, teams[2], goals[] }
+groups/{그룹ID}/meta/lineup        현재 라인업 (참가자, 팀 배치)
 ```
 
-## 사용한 외부 리소스
-- [Tesseract.js](https://github.com/naptha/tesseract.js) 5.1.1 (Apache-2.0) — 캡처 글자 인식, 처음 쓸 때 CDN(jsdelivr)에서 불러와요
-- [Noto Sans KR](https://fonts.google.com/noto/specimen/Noto+Sans+KR) (SIL OFL) — Google Fonts
+`js/config.js`의 `GROUP_ID`를 바꾸면 같은 Firebase 프로젝트로 여러 모임을 따로 운영할 수 있어요.
+
+## 수정할 때 참고
+
+| 바꾸고 싶은 것 | 파일 |
+| --- | --- |
+| 포메이션 추가/자리 위치 | `js/formations.js` |
+| 팀 나누기 방식 | `js/lineup.js` → `balanceSplit()` |
+| 포지션 적합도 점수 | `js/players.js` → `fit()` |
+| 통계 항목 | `js/stats.js`, `js/views/players.js` |
+| 색·글꼴·여백 | `css/style.css` (맨 위 `:root` 변수) |
+| 새 버튼 동작 | HTML에 `data-act="이름"` → `js/events.js`의 `actions`에 함수 추가 |
+
+새 JS 파일을 추가했다면 `sw.js`의 `APP_FILES`에도 넣고, 배포할 때마다 `sw.js`의 `VERSION`을 올려 주세요.

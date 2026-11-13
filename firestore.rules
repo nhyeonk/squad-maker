@@ -1,0 +1,25 @@
+rules_version = '2';
+
+// 스쿼드 메이커 보안 규칙
+// - 누구나 읽기 가능 (링크만 있으면 친구들이 로그인 없이 기록을 봐요)
+// - 쓰기는 아래 목록에 있는 기록자 이메일로 로그인한 사람만
+//
+// Firebase 콘솔 → Firestore Database → 규칙(Rules) 탭에 통째로 붙여넣고 "게시"를 누르세요.
+// 기록자 이메일은 Authentication → 사용자 추가에서 만든 계정과 똑같이 적어야 해요.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isRecorder() {
+      return request.auth != null
+        && request.auth.token.email in [
+          'recorder@example.com'   // ← 기록자 이메일로 바꾸세요. 여러 명이면 쉼표로 추가
+        ];
+    }
+
+    match /groups/{groupId}/{document=**} {
+      allow read: if true;
+      allow write: if isRecorder();
+    }
+  }
+}

@@ -1,65 +1,184 @@
-/* 스쿼드 메이커 · store.js
- * 데이터·저장: 상태, 이 기기 저장(localStorage), 저장 대기열, 계산용 함수
- */
-/* ================= data ================= */
-let roster={};    // pid -> {name, createdAt}
-let matches={};   // id -> match
-let cur=freshCurrent();
-let mode='local', readOnly=false, loaded=false;
-let view='lineup', openMatch=null, statSort='g', openStat=null;
-let sel=null;
+// 데이터 저장소: 로컬(localStorage) 또는 Firebase Firestore (실시간 공유)
+import { FIREBASE_CONFIG, GROUP_ID, FIREBASE_SDK_VERSION, STORAGE_KEY, CONFIG_KEY } from "./config.js";
+import { S, hooks, defaultLineup } from "./state.js";
+import { toast } from "./utils.js";
 
-/* ---- 저장 ----
- * 지금은 이 기기(localStorage)에만 저장해요.
- * 나중에 Firebase 같은 서버를 붙일 때는 아래 putCurrent·putPlayer·putMatch 같은 저장 함수 안만 바꾸면 돼요.
- */
-function saveLocal(){try{localStorage.setItem(LKEY,JSON.stringify({roster,matches,cur}))}catch(e){toast('저장 공간이 부족해서 저장하지 못했어요')}}
-function loadLocal(){try{const s=JSON.parse(localStorage.getItem(LKEY));if(s){roster=s.roster||{};matches=s.matches||{};if(s.cur&&s.cur.teams)cur=s.cur}}catch(e){}}
-function putCurrent(){saveLocal()}
-function putPlayer(pid){saveLocal()}
-function delPlayerDoc(pid){saveLocal()}
-function putMatch(id,delay){saveLocal()}
-function delMatchDoc(id){saveLocal()}
-function commit(){putCurrent();renderAll()}
+let FB = null; // { db, fs, au, auth, gid }
+let lineupTimer;
 
-/* ================= derived ================= */
-const T=()=>cur.teams[cur.active];
-const keys=()=>TK.slice(0,cur.teamCount||2);
-function ensureTeams(){keys().forEach((k,i)=>{if(!cur.teams[k])cur.teams[k]=newTeam(k+'팀',COLORS[i],cur.size);const t=cur.teams[k];t.color=COLORS[i];if(/^[A-H]팀$/.test(t.name))t.name=k+'팀'});for(const k of keys()){if(!Array.isArray(cur.teams[k].subs))cur.teams[k].subs=[];if(cur.teams[k].slots.length!==cur.size)remap(cur.teams[k],FORMATIONS[cur.size][0])}if(!keys().includes(cur.active))cur.active='A'}
-const pname=id=>roster[id]?roster[id].name:'(삭제됨)';
-const subsOf=t=>Array.isArray(t.subs)?t.subs:(t.subs=[]);
-function assignedIds(){const s=new Set();for(const k of keys()){for(const sl of cur.teams[k].slots)if(sl.pid)s.add(sl.pid);for(const p of subsOf(cur.teams[k]))s.add(p)}return s}
-function whereIs(pid){for(const k of keys()){const s=cur.teams[k].slots.find(s=>s.pid===pid);if(s)return {k,code:posOf(s).code};if(subsOf(cur.teams[k]).includes(pid))return {k,code:'SUB'}}return null}
-function pastList(){
-  const last=sortedMatches()[0];if(!last) return {ids:[],m:null};
-  const [mid,m]=last;
-  const hid=cur.pastHidden&&cur.pastHidden.mid===mid?new Set(cur.pastHidden.ids):new Set();
-  const att=new Set(cur.attendees);
-  const ids=[...(m.teams.A.players||[]),...(m.teams.B.players||[])].filter((id,i,a)=>a.indexOf(id)===i&&roster[id]&&!att.has(id)&&!hid.has(id));
-  return {ids,m,mid};
-}
-function bench(){const a=assignedIds();return cur.attendees.filter(id=>roster[id]&&!a.has(id))}
-function score(m,k){return (m.goals||[]).filter(g=>g.team===k).length}
-function sortedMatches(){return Object.entries(matches).sort((a,b)=>(b[1].date||'').localeCompare(a[1].date||'')||(b[1].createdAt||0)-(a[1].createdAt||0))}
-let STATS={};
-function computeStats(){
-  const st={};const E=pid=>st[pid]||(st[pid]={apps:0,w:0,d:0,l:0,g:0,a:0,pc:{},hist:[]});
-  for(const [id,m] of sortedMatches()){
-    const sa=score(m,'A'),sb=score(m,'B');
-    const gm={},am={};
-    for(const g of m.goals||[]){if(g.scorer&&!g.og)gm[g.scorer]=(gm[g.scorer]||0)+1;if(g.assist)am[g.assist]=(am[g.assist]||0)+1}
-    for(const k of ['A','B']){
-      const tm=m.teams&&m.teams[k];if(!tm) continue;
-      const my=k==='A'?sa:sb,op=k==='A'?sb:sa,res=my>op?'W':my<op?'L':'D';
-      for(const pid of tm.players||[]){
-        const s=E(pid);s.apps++;s[res.toLowerCase()]++;
-        const pc=tm.pos&&tm.pos[pid];if(pc&&pc!=='SUB')s.pc[pc]=(s.pc[pc]||0)+1;
-        s.hist.push({id,date:m.date,title:m.title,team:tm.name,res,my,op,g:gm[pid]||0,a:am[pid]||0,pos:pc||null});
-      }
-    }
-    for(const pid in gm)E(pid).g+=gm[pid];
-    for(const pid in am)E(pid).a+=am[pid];
+const plain = (o) => JSON.parse(JSON.stringify(o)); // Firestore는 undefined를 못 받아요
+
+/* ---------- 로컬 ---------- */
+export function loadLocal() {
+  try {
+    const d = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    return { players: d.players || {}, matches: d.matches || {}, lineup: d.lineup || null };
+  } catch {
+    return { players: {}, matches: {}, lineup: null };
   }
-  STATS=st;
 }
-const goalsOf=pid=>STATS[pid]?STATS[pid].g:0;
+function saveLocal() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ players: S.players, matches: S.matches, lineup: S.lineup }));
+  } catch {
+    toast("저장 공간이 부족해요");
+  }
+}
+
+/* ---------- 쓰기 API (화면 코드는 이것만 쓰면 돼요) ---------- */
+const ref = (...path) => FB.fs.doc(FB.db, "groups", FB.gid, ...path);
+
+async function remote(fn) {
+  try {
+    await fn();
+  } catch (e) {
+    console.error(e);
+    toast(e.code === "permission-denied" ? "저장 권한이 없어요. 기록자 계정으로 로그인하세요." : "저장 실패: " + (e.code || e.message));
+  }
+}
+
+export const api = {
+  putPlayer(p) {
+    S.players[p.id] = p;
+    if (FB) return remote(() => FB.fs.setDoc(ref("players", p.id), plain(p)));
+    saveLocal();
+  },
+  delPlayer(id) {
+    delete S.players[id];
+    if (FB) return remote(() => FB.fs.deleteDoc(ref("players", id)));
+    saveLocal();
+  },
+  putMatch(m) {
+    m.updatedAt = Date.now();
+    S.matches[m.id] = m;
+    if (FB) return remote(() => FB.fs.setDoc(ref("matches", m.id), plain(m)));
+    saveLocal();
+  },
+  delMatch(id) {
+    delete S.matches[id];
+    if (FB) return remote(() => FB.fs.deleteDoc(ref("matches", id)));
+    saveLocal();
+  },
+  /** 라인업은 자주 바뀌니까 0.5초 모아서 저장 */
+  putLineup() {
+    if (!FB) return saveLocal();
+    clearTimeout(lineupTimer);
+    lineupTimer = setTimeout(() => remote(() => FB.fs.setDoc(ref("meta", "lineup"), plain(S.lineup))), 500);
+  },
+};
+
+/* ---------- 서버 설정 ---------- */
+export function getCfg() {
+  try {
+    const c = JSON.parse(localStorage.getItem(CONFIG_KEY) || "null");
+    if (c?.config) return c;
+  } catch {}
+  if (FIREBASE_CONFIG) return { config: FIREBASE_CONFIG, gid: GROUP_ID };
+  return null;
+}
+export function saveCfg(config, gid) {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify({ config, gid }));
+}
+export function clearCfg() {
+  localStorage.removeItem(CONFIG_KEY);
+}
+export const groupId = () => FB?.gid;
+
+/** Firebase 콘솔에서 복사한 firebaseConfig 코드 조각을 객체로 */
+export function parseConfig(text) {
+  const o = {};
+  ["apiKey", "authDomain", "projectId", "storageBucket", "messagingSenderId", "appId", "measurementId", "databaseURL"].forEach((k) => {
+    const m = text.match(new RegExp(`["']?${k}["']?\\s*:\\s*["']([^"']+)["']`));
+    if (m) o[k] = m[1];
+  });
+  return o.apiKey && o.projectId ? o : null;
+}
+
+/* 공유 링크: 주소 뒤 #join=... 에 서버 설정을 담아 친구 폰에 자동 연결 */
+const b64e = (s) => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const b64d = (s) => decodeURIComponent(escape(atob(s.replace(/-/g, "+").replace(/_/g, "/"))));
+
+export function readJoinHash() {
+  const m = location.hash.match(/join=([A-Za-z0-9_\-]+)/);
+  if (!m) return;
+  try {
+    const d = JSON.parse(b64d(m[1]));
+    if (d.c?.projectId) saveCfg(d.c, d.g || GROUP_ID);
+  } catch (e) {
+    console.warn(e);
+  }
+  history.replaceState(null, "", location.pathname + location.search);
+}
+export function shareLink() {
+  const base = location.origin + location.pathname;
+  const c = getCfg();
+  // 설정이 config.js에 들어 있으면 링크만으로 충분
+  if (!c || FIREBASE_CONFIG) return base;
+  return base + "#join=" + b64e(JSON.stringify({ c: c.config, g: c.gid }));
+}
+
+/* ---------- 로그인 (기록자) ---------- */
+export const login = (email, pw) => FB.au.signInWithEmailAndPassword(FB.auth, email, pw);
+export const logout = () => FB.au.signOut(FB.auth);
+
+/* ---------- Firebase 연결 & 실시간 구독 ---------- */
+export async function initFirebase(cfg) {
+  const base = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/`;
+  const [appM, fs, au] = await Promise.all([
+    import(base + "firebase-app.js"),
+    import(base + "firebase-firestore.js"),
+    import(base + "firebase-auth.js"),
+  ]);
+  const app = appM.initializeApp(cfg.config);
+  let db;
+  try {
+    db = fs.initializeFirestore(app, { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) });
+  } catch {
+    db = fs.getFirestore(app);
+  }
+  const auth = au.getAuth(app);
+  FB = { db, fs, au, auth, gid: cfg.gid || GROUP_ID };
+  S.mode = "remote";
+  S.canEdit = false;
+
+  au.onAuthStateChanged(auth, (u) => {
+    S.user = u;
+    S.canEdit = !!u;
+    hooks.render();
+  });
+
+  const onErr = (e) => {
+    console.error(e);
+    S.ready = true;
+    toast("서버 연결 오류: " + (e.code || e.message));
+    hooks.render();
+  };
+  let loaded = 0;
+  const loadedOne = () => {
+    if (++loaded === 3) {
+      S.ready = true;
+      hooks.render();
+    }
+  };
+  const col = (n) => fs.collection(db, "groups", FB.gid, n);
+  const toObj = (snap) => {
+    const o = {};
+    snap.forEach((d) => (o[d.id] = d.data()));
+    return o;
+  };
+
+  fs.onSnapshot(col("players"), (snap) => { S.players = toObj(snap); loadedOne(); hooks.scheduleRender(); }, onErr);
+  fs.onSnapshot(col("matches"), (snap) => { S.matches = toObj(snap); loadedOne(); hooks.scheduleRender(); }, onErr);
+  fs.onSnapshot(ref("meta", "lineup"), (d) => {
+    if (!d.metadata.hasPendingWrites) S.lineup = d.exists() ? d.data() : S.lineup || defaultLineup();
+    loadedOne();
+    hooks.scheduleRender();
+  }, onErr);
+}
+
+export function useLocal() {
+  FB = null;
+  S.mode = "local";
+  S.canEdit = true;
+  Object.assign(S, loadLocal());
+}
