@@ -179,7 +179,7 @@ export function viewLineup() {
     </div>
     <div class="pitchwrap">${pitch(l, T, slots)}${side(l, T)}</div>
     <div class="legend"><span><i style="border-color:var(--fw)"></i>FW</span><span><i style="border-color:var(--mf)"></i>MF</span><span><i style="border-color:var(--df)"></i>DF</span><span><i style="border-color:var(--gk)"></i>GK</span></div>
-    <p class="hint" data-edit>선수를 <b>끌어서</b> 원하는 곳에 놓으면 자리가 옮겨지고, 다른 선수 위에 놓으면 서로 바뀌어요. 눌러서 선택한 뒤 빈 잔디를 눌러도 돼요. 포지션 이름은 위치에 맞게 바뀌고, 아래 바의 <b>포지션</b>으로 직접 고를 수도 있어요.</p>
+    <p class="hint" data-edit>선수를 <b>끌어서</b> 원하는 곳에 놓으면 자리가 옮겨지고, 다른 선수 위에 놓으면 서로 바뀌어요. 경기장 밖 <b>대기 명단·후보·팀 명단</b>으로 끌어내도 돼요. 눌러서 선택한 뒤 빈 잔디를 눌러도 돼요. 포지션 이름은 위치에 맞게 바뀌고, 아래 바의 <b>포지션</b>으로 직접 고를 수도 있어요.</p>
     <div style="display:grid;gap:8px;margin-top:12px">
       <div class="grid2"><button class="btn" data-act="img">🖼️ 스쿼드 이미지 저장</button><button class="btn" data-act="copytext">📋 명단 텍스트 복사</button></div>
       <button class="btn pri block" data-act="startmatch" data-edit>⚽ 이 라인업으로 경기 기록 시작</button>

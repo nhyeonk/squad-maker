@@ -643,11 +643,42 @@ function dropSlot(slotIdx, pt) {
 }
 
 let drag = null, suppressClick = false;
+
+/** 끄는 동안 화면 가장자리에 가까우면 자동 스크롤 */
+function edgeScroll(e) {
+  if (e.clientY > innerHeight - 70) scrollBy(0, 14);
+  else if (e.clientY < 70) scrollBy(0, -14);
+}
+/** 손가락/마우스 아래에 있는 놓을 곳 찾기 (끌고 있는 요소는 빼고) */
+function dropTargetAt(e, ...hide) {
+  hide.forEach((h) => h && (h.style.visibility = "hidden"));
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  hide.forEach((h) => h && (h.style.visibility = ""));
+  return under;
+}
+function markDropOver(under) {
+  document.querySelectorAll(".dropover").forEach((el) => el.classList.remove("dropover"));
+  under?.closest("[data-drop], [data-pdrag]")?.classList.add("dropover");
+}
+/** 경기장 밖(대기 명단·후보·팀 카드·다른 선수)에 놓았을 때 처리. 처리했으면 true */
+function dropOutside(pid, under) {
+  if (!pid || !under) return false;
+  const other = under.closest("[data-pdrag]")?.dataset.pdrag;
+  const zone = under.closest("[data-drop]")?.dataset.drop;
+  if (other && other !== pid) movePlayer(pid, { kind: "player", pid: other });
+  else if (zone === "bench") movePlayer(pid, { kind: "bench", team: S.ui.team });
+  else if (zone === "pool") movePlayer(pid, { kind: "pool" });
+  else if (zone?.startsWith("team:")) movePlayer(pid, { kind: "team", team: +zone.slice(5) });
+  else return false;
+  return true;
+}
+
 function bindPitchDrag() {
   document.addEventListener("pointerdown", (e) => {
     const el = e.target.closest("[data-drag]");
     if (!el || !S.canEdit || e.button > 0) return;
-    drag = { el, idx: +el.dataset.drag, sx: e.clientX, sy: e.clientY, moving: false, id: e.pointerId };
+    const pid = lineup().teams[S.ui.team].slots[+el.dataset.drag] || null;
+    drag = { el, idx: +el.dataset.drag, pid, sx: e.clientX, sy: e.clientY, moving: false, id: e.pointerId, ox: el.style.left, oy: el.style.top };
   });
   document.addEventListener("pointermove", (e) => {
     if (!drag || e.pointerId !== drag.id) return;
@@ -656,13 +687,38 @@ function bindPitchDrag() {
       drag.moving = true;
       drag.el.classList.add("dragging");
       try { drag.el.setPointerCapture(e.pointerId); } catch {}
+      if (drag.pid) document.body.classList.add("pdragging");
     }
     e.preventDefault();
-    const pt = pitchPoint(e);
-    drag.el.style.left = pt.x + "%";
-    drag.el.style.top = pt.y + "%";
-    const lab = drag.el.querySelector(".rl") || drag.el.querySelector(".cir");
-    if (lab) lab.textContent = nearestLabel(pt.x, pt.y);
+    edgeScroll(e);
+    const r = document.getElementById("pitch").getBoundingClientRect();
+    const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    if (inside || !drag.pid) {
+      // 경기장 안: 동그라미가 따라와요
+      drag.ghost?.remove();
+      drag.ghost = null;
+      drag.el.classList.remove("faded");
+      markDropOver(null);
+      const pt = pitchPoint(e);
+      drag.el.style.left = pt.x + "%";
+      drag.el.style.top = pt.y + "%";
+      const lab = drag.el.querySelector(".rl") || drag.el.querySelector(".cir");
+      if (lab) lab.textContent = nearestLabel(pt.x, pt.y);
+    } else {
+      // 경기장 밖: 이름표가 따라오고, 동그라미는 제자리에 흐리게
+      if (!drag.ghost) {
+        drag.ghost = document.createElement("div");
+        drag.ghost.className = "dragghost";
+        drag.ghost.textContent = P(drag.pid)?.name || "";
+        document.body.appendChild(drag.ghost);
+        drag.el.style.left = drag.ox;
+        drag.el.style.top = drag.oy;
+        drag.el.classList.add("faded");
+      }
+      drag.ghost.style.left = e.clientX + "px";
+      drag.ghost.style.top = e.clientY + "px";
+      markDropOver(dropTargetAt(e, drag.ghost));
+    }
   }, { passive: false });
   const end = (e) => {
     if (!drag || e.pointerId !== drag.id) return;
@@ -670,13 +726,23 @@ function bindPitchDrag() {
     drag = null;
     if (!d.moving) return;
     suppressClick = true;
-    setTimeout(() => (suppressClick = false), 50);
+    setTimeout(() => (suppressClick = false), 60);
+    document.body.classList.remove("pdragging");
+    markDropOver(null);
+    if (d.ghost) {
+      const under = dropTargetAt(e, d.ghost);
+      d.ghost.remove();
+      if (dropOutside(d.pid, under)) return commitLineup();
+      return render(); // 놓을 곳이 아니면 제자리로
+    }
     dropSlot(d.idx, pitchPoint(e));
   };
   document.addEventListener("pointerup", end);
   document.addEventListener("pointercancel", (e) => {
     if (drag && e.pointerId === drag.id) {
+      drag.ghost?.remove();
       drag = null;
+      document.body.classList.remove("pdragging");
       render();
     }
   });
@@ -716,6 +782,7 @@ function bindPlayerDrag() {
   };
   const move = (e) => {
     if (!pdrag?.ghost) return;
+    edgeScroll(e);
     pdrag.ghost.style.left = e.clientX + "px";
     pdrag.ghost.style.top = e.clientY + "px";
     document.querySelectorAll(".dropover").forEach((el) => el.classList.remove("dropover"));
@@ -735,17 +802,11 @@ function bindPlayerDrag() {
     suppressClick = true;
     setTimeout(() => (suppressClick = false), 60);
     const under = document.elementFromPoint(e.clientX, e.clientY);
-    if (!under) return;
-    const other = under.closest("[data-pdrag]")?.dataset.pdrag;
+    if (!under) return render();
     const slotEl = under.closest("#pitch [data-drag]");
-    const zone = under.closest("[data-drop]")?.dataset.drop;
     if (slotEl) movePlayer(d.pid, { kind: "slot", team: S.ui.team, slot: +slotEl.dataset.drag });
     else if (under.closest("#pitch")) dropPlayerOnPitch(d.pid, pitchPoint(e));
-    else if (other && other !== d.pid) movePlayer(d.pid, { kind: "player", pid: other });
-    else if (zone === "bench") movePlayer(d.pid, { kind: "bench", team: S.ui.team });
-    else if (zone === "pool") movePlayer(d.pid, { kind: "pool" });
-    else if (zone?.startsWith("team:")) movePlayer(d.pid, { kind: "team", team: +zone.slice(5) });
-    else return render();
+    else if (!dropOutside(d.pid, under)) return render();
     commitLineup();
   };
 
