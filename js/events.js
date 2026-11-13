@@ -23,7 +23,7 @@ function commitLineup() {
 const EDIT_ONLY = new Set([
   "tobench", "toteam", "topool", "attend", "unattend", "split", "fill", "clearteam", "resetall", "addteam", "delteam",
   "autoplace", "startmatch", "newmatch", "goal", "delgoal", "mstatus", "delmatch", "mrmplayer", "maddplayer",
-  "ppos", "pskill", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply", "pregular", "attendregulars",
+  "ppos", "pskill", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply", "pregular", "attendregulars", "rostertoggle",
 ]);
 
 const actions = {
@@ -145,7 +145,14 @@ const actions = {
     toast("선호 포지션대로 다시 배치했어요");
   },
   /* ----- 카톡 캡처 → 참가자 ----- */
-  ocr() {
+  roster: () => M.openRoster(),
+  async rostertoggle(v) {
+    await api.putPlayer({ ...P(v), regular: !P(v).regular });
+    M.openRoster();
+    render();
+  },
+  ocr(target) {
+    target = target === "roster" ? "roster" : "attend";
     const inp = document.createElement("input");
     inp.type = "file";
     inp.accept = "image/*";
@@ -153,7 +160,7 @@ const actions = {
     inp.onchange = async () => {
       const files = [...inp.files];
       if (!files.length) return;
-      S.ui.ocr = { busy: true, progress: 0, rows: [] };
+      S.ui.ocr = { busy: true, progress: 0, rows: [], target };
       M.openOcr();
       try {
         const found = await recognizeNames(files, (p) => {
@@ -161,13 +168,11 @@ const actions = {
           if (el) el.textContent = Math.round(p * 100) + "%";
         });
         const l = lineup();
-        S.ui.ocr = {
-          busy: false,
-          rows: found.map((r) => ({ ...r, on: !(r.existingId && l.attendees.includes(r.existingId)) })),
-        };
+        const already = (r) => r.existingId && (target === "roster" ? P(r.existingId)?.regular : l.attendees.includes(r.existingId));
+        S.ui.ocr = { busy: false, target, rows: found.map((r) => ({ ...r, on: !already(r) })) };
       } catch (e) {
         console.error(e);
-        S.ui.ocr = { busy: false, rows: [], error: e.message || "사진을 읽지 못했어요" };
+        S.ui.ocr = { busy: false, rows: [], target, error: e.message || "사진을 읽지 못했어요" };
       }
       M.openOcr();
     };
@@ -184,17 +189,25 @@ const actions = {
     setTimeout(() => [...document.querySelectorAll("[data-ocr-i]")].pop()?.focus(), 30);
   },
   ocrapply() {
+    const rows = S.ui.ocr.rows.filter((r) => r.on && r.name.trim());
+    if (S.ui.ocr.target === "roster") {
+      rows.forEach((r) => {
+        const p = ensurePlayer(r.name);
+        if (p && !p.regular) api.putPlayer({ ...p, regular: true });
+      });
+      toast(`고정 참여 명단에 ${rows.length}명 넣었어요`);
+      M.openRoster();
+      return render();
+    }
     const l = lineup();
     let added = 0;
-    S.ui.ocr.rows
-      .filter((r) => r.on && r.name.trim())
-      .forEach((r) => {
-        const p = ensurePlayer(r.name);
-        if (p && !l.attendees.includes(p.id)) {
-          l.attendees.push(p.id);
-          added++;
-        }
-      });
+    rows.forEach((r) => {
+      const p = ensurePlayer(r.name);
+      if (p && !l.attendees.includes(p.id)) {
+        l.attendees.push(p.id);
+        added++;
+      }
+    });
     M.closeModal();
     commitLineup();
     toast(`${added}명 추가했어요`);
@@ -297,7 +310,7 @@ const actions = {
     const ids = Object.values(S.players).filter((p) => p.regular && !l.attendees.includes(p.id)).map((p) => p.id);
     l.attendees.push(...ids);
     commitLineup();
-    toast(`고정 멤버 ${ids.length}명 추가했어요`);
+    toast(`고정 참여 ${ids.length}명 추가했어요`);
   },
   async pskill(v) {
     const [pid, n] = v.split(":");
@@ -372,7 +385,7 @@ const actions = {
     }
   },
   async recdel(v) {
-    if (!confirm(`${v}을(를) 기록자에서 뺄까요?`)) return;
+    if (!confirm(`${M.maskEmail(v)}을(를) 기록자에서 뺄까요?`)) return;
     await setRecorders((S.recorders.emails || []).filter((x) => x !== v)).catch((e) => toast("실패: " + e.code));
     M.openSettings();
   },
@@ -427,12 +440,23 @@ const forms = {
     render();
     M.openPlayer(p.id);
   },
+  rosteradd(f) {
+    const names = parseNames(f.n.value);
+    names.forEach((n) => {
+      const p = ensurePlayer(n);
+      if (p && !p.regular) api.putPlayer({ ...p, regular: true });
+    });
+    M.openRoster();
+    render();
+    setTimeout(() => $('form[data-act="rosteradd"] input')?.focus(), 30);
+  },
   async recadd(f) {
     const email = f.n.value.trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast("이메일 형식을 확인하세요");
     try {
       await setRecorders([...(S.recorders.emails || []), email]);
       toast("기록자를 추가했어요");
+      S.ui.recordersOpen = true;
       M.openSettings();
     } catch (e) {
       toast("실패: " + (e.code || e.message));
@@ -525,13 +549,19 @@ export function bindEvents() {
 
   // 카톡 투표 결과처럼 여러 줄을 붙여넣으면 이름만 뽑아서 넣기
   document.addEventListener("paste", (e) => {
-    const inp = e.target.closest?.('form[data-act="addnames"] input');
+    const inp = e.target.closest?.('form[data-act="addnames"] input, form[data-act="rosteradd"] input');
     if (!inp) return;
     const t = e.clipboardData.getData("text");
     if (!t.includes("\n")) return;
     e.preventDefault();
     inp.value = parseNames(t).join(", ");
   });
+
+  // 접었다 펼친 상태 기억 (설정 창이 새로 그려져도 유지)
+  document.addEventListener("toggle", (e) => {
+    const k = e.target.dataset?.actToggle;
+    if (k) S.ui[k] = e.target.open;
+  }, true);
 
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;

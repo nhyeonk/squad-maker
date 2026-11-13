@@ -170,3 +170,15 @@ code{background:var(--soft);padding:1px 5px;border-radius:5px;font-size:12.5px}
 .btn.kakao{background:#fee500;color:#191600}
 details.others{margin-top:8px}
 details.others summary{font-size:12.5px;color:var(--sub);font-weight:700;cursor:pointer;padding:4px 0}
+/* 기록자 관리 */
+.recbox{border:1px solid var(--line);border-radius:12px;padding:0 12px}
+.recbox summary{list-style:none;display:flex;justify-content:space-between;align-items:center;padding:12px 0;cursor:pointer;font-size:14px}
+.recbox summary::-webkit-details-marker{display:none}
+.recbox .chev{font-size:20px;color:var(--mute);transition:transform .15s}
+.recbox[open] .chev{transform:rotate(90deg)}
+.recbox[open]{padding-bottom:12px}
+.reclist{max-height:220px;overflow:auto;border-top:1px solid var(--soft)}
+.recrow{display:flex;justify-content:space-between;align-items:center;padding:9px 2px;border-bottom:1px solid var(--soft);font-size:13.5px}
+.rectag{font-size:12px;color:var(--sub)}
+.recdel{width:28px;height:28px;border-radius:8px;color:var(--mute);font-size:18px}
+.recdel:hover{background:#ffecec;color:#d13438}

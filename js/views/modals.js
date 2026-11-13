@@ -48,7 +48,7 @@ export function openPlayer(pid) {
   const stars = [1, 2, 3, 4, 5].map((n) => `<button class="${n <= (p.skill || 3) ? "on" : ""}" data-act="pskill" data-v="${pid}:${n}" ${dis}>★</button>`).join("");
 
   openModal(`<h2>${ed ? `<input class="in" id="pnm" value="${esc(p.name)}" style="font-weight:800;font-size:17px">` : esc(p.name)}${closeBtn}</h2>
-    <div class="sec"><button class="btn block ${p.regular ? "pri" : "ghost"}" data-act="pregular" data-v="${pid}" ${dis}>${p.regular ? "⭐ 고정 멤버 (눌러서 해제)" : "☆ 고정 멤버로 지정"}</button></div>
+    <div class="sec"><button class="btn block ${p.regular ? "pri" : "ghost"}" data-act="pregular" data-v="${pid}" ${dis}>${p.regular ? "⭐ 고정 참여 (눌러서 해제)" : "☆ 고정 참여로 지정"}</button></div>
     <div class="sec"><label>선호 포지션 · 누른 순서가 우선순위예요</label><div class="posbtns">${posBtns}</div></div>
     <div class="sec"><label>실력 (팀 밸런스용)</label><div class="stars">${stars}</div></div>
     <div class="sec"><label>기록</label>
@@ -168,9 +168,9 @@ export function openOcr() {
       ? `<p class="hint" style="margin:0 0 10px">잘못 읽힌 이름은 눌러서 고치고, 빼고 싶은 사람은 체크를 끄세요.</p>${rows}`
       : `<div class="empty">이름을 찾지 못했어요. 투표자 목록이 잘 보이게 다시 캡처해 보세요.</div>`;
     body += `<div class="grid2" style="margin-top:12px"><button class="btn" data-act="ocradd">+ 이름 직접 추가</button><button class="btn" data-act="ocr">사진 다시 고르기</button></div>
-      <button class="btn pri block" style="margin-top:8px" id="ocrapply" data-act="ocrapply" ${n ? "" : "disabled"}>${n}명 참가자로 추가</button>`;
+      <button class="btn pri block" style="margin-top:8px" id="ocrapply" data-act="ocrapply" ${n ? "" : "disabled"}>${n}명 ${o.target === "roster" ? "고정 참여 명단에 추가" : "참가자로 추가"}</button>`;
   }
-  openModal(`<h2>📷 카톡 투표 캡처${closeBtn}</h2>${body}`);
+  openModal(`<h2>📷 ${o.target === "roster" ? "캡처로 고정 명단 만들기" : "카톡 투표 캡처"}${closeBtn}</h2>${body}`);
 }
 
 export function ocrTag(r, i) {
@@ -184,7 +184,7 @@ export function updateOcrCount() {
   if (!b) return;
   const n = S.ui.ocr.rows.filter((r) => r.on && r.name.trim()).length;
   b.disabled = !n;
-  b.textContent = `${n}명 참가자로 추가`;
+  b.textContent = `${n}명 ${S.ui.ocr.target === "roster" ? "고정 참여 명단에 추가" : "참가자로 추가"}`;
 }
 
 function accountSection() {
@@ -207,11 +207,42 @@ function accountSection() {
     <button class="btn block" style="margin-top:8px" data-act="logout">로그아웃</button></div>`;
 }
 
+/** "skawlgus6216@gmail.com" → "ska***16@gmail.com" */
+export function maskEmail(e = "") {
+  const [id, domain] = e.split("@");
+  if (!domain) return e;
+  const shown = id.length <= 4 ? id.slice(0, 1) + "***" : id.slice(0, 3) + "***" + id.slice(-2);
+  return `${shown}@${domain}`;
+}
+
 function recordersSection() {
   const list = S.recorders?.emails || [];
-  return `<div class="sec"><label>기록자 관리 <span class="badge">${list.length + 1}명</span></label>
-    <div class="hist" style="border:0"><span>👑 ${esc(S.recorders.owner)}</span><span style="color:var(--sub)">관리자</span></div>
-    ${list.map((e) => `<div class="hist"><span>${esc(e)}</span><button class="btn sm danger" data-act="recdel" data-v="${esc(e)}">삭제</button></div>`).join("")}
-    <form class="row" data-act="recadd" style="margin-top:8px"><input class="in" name="n" type="email" placeholder="기록자 이메일 (구글 계정)"><button class="btn pri">추가</button></form>
-    <p class="hint">추가된 사람은 구글로 로그인하면 바로 기록을 입력할 수 있어요.</p></div>`;
+  const open = S.ui.recordersOpen ? "open" : "";
+  return `<div class="sec"><details class="recbox" ${open} data-act-toggle="recordersOpen">
+    <summary><span>✏️ 기록자 <b>${list.length + 1}명</b> · 관리</span><span class="chev">›</span></summary>
+    <div class="reclist">
+      <div class="recrow"><span>👑 ${esc(maskEmail(S.recorders.owner))}</span><span class="rectag">관리자</span></div>
+      ${list.map((e) => `<div class="recrow"><span title="${esc(e)}">${esc(maskEmail(e))}</span><button class="recdel" data-act="recdel" data-v="${esc(e)}" aria-label="삭제">×</button></div>`).join("")}
+    </div>
+    <form class="row" data-act="recadd" style="margin-top:10px"><input class="in" name="n" type="email" placeholder="기록자 구글 이메일 추가"><button class="btn pri">추가</button></form>
+    <p class="hint">추가된 사람은 구글로 로그인하면 바로 기록을 입력할 수 있어요.</p>
+  </details></div>`;
+}
+
+/* ---------- 고정 참여 명단 ---------- */
+export function openRoster() {
+  const all = Object.values(S.players).sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  const regs = all.filter((p) => p.regular);
+  const others = all.filter((p) => !p.regular);
+  const ed = S.canEdit;
+  openModal(`<h2>⭐ 고정 참여 명단 <span class="badge">${regs.length}명</span>${closeBtn}</h2>
+    <p class="hint" style="margin:0 0 12px">매주 오는 사람을 넣어 두면 라인업 탭에서 <b>고정 참여 모두 추가</b> 한 번으로 참가자가 채워져요.</p>
+    ${ed ? `<form class="row" data-act="rosteradd"><input class="in" name="n" placeholder="이름 (여러 명은 쉼표로)" autocomplete="off"><button class="btn pri">추가</button></form>
+      <button class="btn kakao block" style="margin-top:8px" data-act="ocr" data-v="roster">📷 카톡 캡처로 명단 만들기</button>` : ""}
+    <div class="sec" style="margin-top:14px"><label>고정 참여 ${regs.length}명${ed ? " · 눌러서 빼기" : ""}</label>
+      ${regs.length ? `<div class="chips">${regs.map((p) => `<button class="chip sel" data-act="rostertoggle" data-v="${p.id}" ${ed ? "" : "disabled"}>⭐ ${esc(p.name)}${ed ? `<span class="x">×</span>` : ""}</button>`).join("")}</div>`
+        : `<div class="empty">아직 비어 있어요. 이름을 넣거나 카톡 캡처로 만들어 보세요.</div>`}</div>
+    ${others.length ? `<div class="sec"><label>다른 선수${ed ? " · 눌러서 고정 참여로" : ""}</label>
+      <div class="chips">${others.map((p) => `<button class="chip ghost" data-act="rostertoggle" data-v="${p.id}" ${ed ? "" : "disabled"}>+ ${esc(p.name)}</button>`).join("")}</div></div>` : ""}
+    <button class="btn block" data-act="close">완료</button>`);
 }
