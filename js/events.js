@@ -4,6 +4,7 @@ import { S, P, lineup, defaultLineup, mkTeam } from "./state.js";
 import { api, parseConfig, saveCfg, clearCfg, shareLink, login, logout, loadLocal } from "./store.js";
 import { FORMATIONS } from "./formations.js";
 import { ensurePlayer, findByName, parseNames } from "./players.js";
+import { recognizeNames } from "./ocr.js";
 import { locate, removeFrom, movePlayer, autoPlace, relayoutAll, balanceSplit, fillEmpty, teamPlayers, poolList } from "./lineup.js";
 import { createMatchFromLineup, createBlankMatch, addGoal, removeGoal, addToMatch, removeFromMatch, updateMatchField } from "./matches.js";
 import { lineupText, saveSquadImage, exportBackup, importBackup, mergeData } from "./share.js";
@@ -22,7 +23,7 @@ function commitLineup() {
 const EDIT_ONLY = new Set([
   "tobench", "toteam", "topool", "attend", "unattend", "split", "fill", "clearteam", "resetall", "addteam", "delteam",
   "autoplace", "startmatch", "newmatch", "goal", "delgoal", "mstatus", "delmatch", "mrmplayer", "maddplayer",
-  "ppos", "pskill", "psave", "pdel", "newplayer", "upload", "import",
+  "ppos", "pskill", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply",
 ]);
 
 const actions = {
@@ -142,6 +143,61 @@ const actions = {
     lineup().teams.forEach((T, i) => autoPlace(i, teamPlayers(T).filter(P)));
     commitLineup();
     toast("선호 포지션대로 다시 배치했어요");
+  },
+  /* ----- 카톡 캡처 → 참가자 ----- */
+  ocr() {
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = "image/*";
+    inp.multiple = true; // 목록이 길면 여러 장 캡처
+    inp.onchange = async () => {
+      const files = [...inp.files];
+      if (!files.length) return;
+      S.ui.ocr = { busy: true, progress: 0, rows: [] };
+      M.openOcr();
+      try {
+        const found = await recognizeNames(files, (p) => {
+          const el = $("#ocrpct");
+          if (el) el.textContent = Math.round(p * 100) + "%";
+        });
+        const l = lineup();
+        S.ui.ocr = {
+          busy: false,
+          rows: found.map((r) => ({ ...r, on: !(r.existingId && l.attendees.includes(r.existingId)) })),
+        };
+      } catch (e) {
+        console.error(e);
+        S.ui.ocr = { busy: false, rows: [], error: e.message || "사진을 읽지 못했어요" };
+      }
+      M.openOcr();
+    };
+    inp.click();
+  },
+  ocrtoggle(v) {
+    const r = S.ui.ocr.rows[+v];
+    r.on = !r.on;
+    M.openOcr();
+  },
+  ocradd() {
+    S.ui.ocr.rows.push({ raw: "", name: "", existingId: null, on: true });
+    M.openOcr();
+    setTimeout(() => [...document.querySelectorAll("[data-ocr-i]")].pop()?.focus(), 30);
+  },
+  ocrapply() {
+    const l = lineup();
+    let added = 0;
+    S.ui.ocr.rows
+      .filter((r) => r.on && r.name.trim())
+      .forEach((r) => {
+        const p = ensurePlayer(r.name);
+        if (p && !l.attendees.includes(p.id)) {
+          l.attendees.push(p.id);
+          added++;
+        }
+      });
+    M.closeModal();
+    commitLineup();
+    toast(`${added}명 추가했어요`);
   },
   img: () => saveSquadImage(),
   copytext: () => copyText(lineupText()),
@@ -406,6 +462,19 @@ export function bindEvents() {
       updateMatchField(k.slice(2), el.value.trim());
       render();
     } else changes[k]?.(el);
+  });
+
+  // 사진 인식 결과에서 이름 고치기 (다시 그리지 않고 그 자리에서 표시만 바꿔요)
+  document.addEventListener("input", (e) => {
+    const oi = e.target.closest("[data-ocr-i]");
+    if (!oi || !S.ui.ocr) return;
+    const i = +oi.dataset.ocrI;
+    const r = S.ui.ocr.rows[i];
+    r.name = oi.value.trim();
+    r.existingId = findByName(r.name)?.id || null;
+    const tag = document.getElementById("ocrtag-" + i);
+    if (tag) tag.outerHTML = M.ocrTag(r, i);
+    M.updateOcrCount();
   });
 
   // 카톡 투표 결과처럼 여러 줄을 붙여넣으면 이름만 뽑아서 넣기

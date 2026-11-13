@@ -1,6 +1,6 @@
 // 서비스 워커: 앱 파일을 캐시해서 오프라인에서도 열리게 해요.
 // 앱 파일을 수정해 배포할 때는 VERSION 숫자를 올려 주세요. (폰에 새 버전이 반영돼요)
-const VERSION = "v1";
+const VERSION = "v2";
 const CACHE = `squadmaker-${VERSION}`;
 const APP_FILES = [
   "./",
@@ -20,6 +20,7 @@ const APP_FILES = [
   "./js/matches.js",
   "./js/stats.js",
   "./js/share.js",
+  "./js/ocr.js",
   "./js/render.js",
   "./js/events.js",
   "./js/views/common.js",

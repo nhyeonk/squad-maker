@@ -143,3 +143,48 @@ export function openSettings() {
       <label class="lb" style="display:block;margin:10px 0 6px">그룹 ID (모임 이름, 영문)</label><input class="in" id="gid" value="${esc(c?.gid || GROUP_ID)}">
       <button class="btn pri block" style="margin-top:10px" data-act="connect">연결하기</button></div>${backup}`);
 }
+
+/* ---------- 카톡 캡처 이름 인식 결과 ---------- */
+export function openOcr() {
+  const o = S.ui.ocr;
+  let body;
+  if (o.error) {
+    body = `<div class="empty">${esc(o.error)}</div><button class="btn block" data-act="ocr">다시 시도</button>`;
+  } else if (o.busy) {
+    body = `<div class="empty" style="padding:28px 0"><div style="font-size:28px">🔍</div>
+      <b>이름 읽는 중… <span id="ocrpct">${Math.round((o.progress || 0) * 100)}%</span></b>
+      <p class="hint">처음 한 번은 한글 인식 데이터를 받느라 10초쯤 걸려요.</p></div>`;
+  } else {
+    const rows = o.rows
+      .map((r, i) => {
+        const tag = ocrTag(r, i);
+        const fixed = r.raw && r.raw !== r.name ? `<div style="font-size:11.5px;color:var(--sub);margin-top:2px">인식: ${esc(r.raw)} → 바로잡음</div>` : "";
+        return `<div class="ocr-row ${r.on ? "" : "off"}">
+          <button class="ocr-ck ${r.on ? "on" : ""}" data-act="ocrtoggle" data-v="${i}">${r.on ? "✓" : ""}</button>
+          <div style="flex:1;min-width:0"><input class="in" data-ocr-i="${i}" value="${esc(r.name)}" placeholder="이름">${fixed}</div>
+          ${tag}</div>`;
+      })
+      .join("");
+    const n = o.rows.filter((r) => r.on && r.name.trim()).length;
+    body = o.rows.length
+      ? `<p class="hint" style="margin:0 0 10px">잘못 읽힌 이름은 눌러서 고치고, 빼고 싶은 사람은 체크를 끄세요.</p>${rows}`
+      : `<div class="empty">이름을 찾지 못했어요. 투표자 목록이 잘 보이게 다시 캡처해 보세요.</div>`;
+    body += `<div class="grid2" style="margin-top:12px"><button class="btn" data-act="ocradd">+ 이름 직접 추가</button><button class="btn" data-act="ocr">사진 다시 고르기</button></div>
+      <button class="btn pri block" style="margin-top:8px" id="ocrapply" data-act="ocrapply" ${n ? "" : "disabled"}>${n}명 참가자로 추가</button>`;
+  }
+  openModal(`<h2>📷 카톡 투표 캡처${closeBtn}</h2>${body}`);
+}
+
+export function ocrTag(r, i) {
+  if (!r.name) return `<span class="badge" id="ocrtag-${i}" style="visibility:hidden">새 선수</span>`;
+  return r.existingId && P(r.existingId)
+    ? `<span class="badge" id="ocrtag-${i}">기존 선수</span>`
+    : `<span class="badge" id="ocrtag-${i}" style="background:#fff1d6;color:#8a5a00">새 선수</span>`;
+}
+export function updateOcrCount() {
+  const b = document.getElementById("ocrapply");
+  if (!b) return;
+  const n = S.ui.ocr.rows.filter((r) => r.on && r.name.trim()).length;
+  b.disabled = !n;
+  b.textContent = `${n}명 참가자로 추가`;
+}

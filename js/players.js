@@ -48,3 +48,51 @@ export function fit(pid, role) {
   if (role === "GK") return pos.length ? -3 : -1; // 골키퍼는 원하는 사람 우선
   return pos.length ? 0 : 0.5;
 }
+
+/* ---------- 비슷한 이름 찾기 (사진 인식 오타 바로잡기) ---------- */
+const CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
+const JUNG = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ";
+const JONG = " ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ";
+
+/** "박하늘" → "ㅂㅏㄱㅎㅏㄴㅡㄹ" (자모 단위로 비교하면 한 획 틀린 글자도 가깝게 나와요) */
+function jamo(s) {
+  let out = "";
+  for (const ch of s) {
+    const c = ch.charCodeAt(0) - 0xac00;
+    if (c < 0 || c > 11171) {
+      out += ch;
+      continue;
+    }
+    out += CHO[Math.floor(c / 588)] + JUNG[Math.floor((c % 588) / 28)] + (JONG[c % 28] === " " ? "" : JONG[c % 28]);
+  }
+  return out;
+}
+
+function editDistance(a, b) {
+  const dp = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = dp[0];
+    dp[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = dp[j];
+      dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = tmp;
+    }
+  }
+  return dp[b.length];
+}
+
+/** 이름이 같거나 아주 비슷한 기존 선수 (없으면 null) */
+export function similarPlayer(name) {
+  const exact = findByName(name);
+  if (exact) return exact;
+  const a = jamo(name);
+  let best = null, bestD = Infinity;
+  for (const p of Object.values(S.players)) {
+    if (p.name.length !== name.length) continue; // 글자 수가 같은 이름끼리만
+    const d = editDistance(a, jamo(p.name));
+    if (d < bestD) [best, bestD] = [p, d];
+  }
+  // 자모 2개까지 틀린 건 같은 사람으로 봐요 (예: 방하능 ↔ 박하늘)
+  return best && bestD <= Math.max(2, Math.floor(a.length * 0.25)) ? best : null;
+}

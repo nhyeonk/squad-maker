@@ -61,7 +61,8 @@ function attendeesCard(l) {
   return `<div class="card" data-edit>
     <h3>오늘 참가자 <span class="badge">${l.attendees.filter(P).length}명</span></h3>
     <form class="row" data-act="addnames"><input class="in" name="n" placeholder="이름 입력 (여러 명은 쉼표로)" autocomplete="off"><button class="btn pri">추가</button></form>
-    <p class="hint">카톡 투표 결과를 그대로 붙여넣어도 이름만 골라 넣어요. 같은 이름은 같은 선수로 기록이 이어져요.</p>
+    <button class="btn kakao block" style="margin-top:8px" data-act="ocr">📷 카톡 투표 캡처로 추가</button>
+    <p class="hint">투표자 목록을 캡처해서 올리면 이름을 읽어 넣어요. 같은 이름은 같은 선수로 기록이 이어져요.</p>
     ${known.length ? `<div style="margin-top:10px"><label class="lb">지난 참가자 · 눌러서 추가</label>
       <div class="chips" style="margin-top:6px">${known.map((p) => `<button class="chip ghost" data-act="attend" data-v="${p.id}">+ ${esc(p.name)}</button>`).join("")}</div></div>` : ""}
   </div>`;

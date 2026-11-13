@@ -162,3 +162,9 @@ body.ro [data-edit]{display:none!important}
 .wl{font-weight:800;font-size:12px;padding:2px 7px;border-radius:6px}
 .wl.W{background:#e3f2e8;color:var(--green)}.wl.D{background:var(--soft);color:var(--sub)}.wl.L{background:#ffe9e9;color:#d13438}
 code{background:var(--soft);padding:1px 5px;border-radius:5px;font-size:12.5px}
+/* 사진 인식 결과 */
+.ocr-row{display:flex;align-items:center;gap:10px;padding:6px 0}
+.ocr-row.off input{opacity:.45;text-decoration:line-through}
+.ocr-ck{width:30px;height:30px;border-radius:9px;border:2px solid var(--line);flex:none;font-weight:900;color:#fff}
+.ocr-ck.on{background:var(--green);border-color:var(--green)}
+.btn.kakao{background:#fee500;color:#191600}
