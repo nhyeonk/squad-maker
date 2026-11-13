@@ -3,6 +3,7 @@ import { S, P, pname, lineup } from "../state.js";
 import { POS, POS_KO, POSITION_GROUPS } from "../formations.js";
 import { computeStats, scoreOf } from "../stats.js";
 import { teamPlayers, currentSlots } from "../lineup.js";
+import { renderSquadCanvas } from "../share.js";
 import { getCfg, groupId } from "../store.js";
 import { GROUP_ID, APP_VERSION } from "../config.js";
 import { $, esc, fmtDate, todayStr } from "../utils.js";
@@ -272,4 +273,25 @@ export function openPosPicker(slotIdx) {
   openModal(`<h2>${pid ? esc(pname(pid)) + " · " : ""}포지션${closeBtn}</h2>
     ${group("FW", "공격")}${group("MF", "미드필더")}${group("DF", "수비")}${group("GK", "골키퍼")}
     ${s.moved ? `<button class="btn block" data-act="posreset" data-v="${slotIdx}">포메이션 원래 자리로</button>` : ""}`);
+}
+
+/* ---------- 스쿼드 이미지 미리보기 ---------- */
+export function openImage(mode = S.ui.imgMode || "team") {
+  S.ui.imgMode = mode;
+  const l = lineup();
+  const T = l.teams[S.ui.team];
+  const nTeams = l.teams.filter((x) => teamPlayers(x).filter(P).length).length || l.teams.length;
+  const st = S.ui.badge === "none" ? {} : computeStats().st;
+  const cv = renderSquadCanvas(mode, st);
+  S.ui.imgCanvas = cv;
+  openModal(`<h2>스쿼드 이미지${closeBtn}</h2>
+    <div class="seg" style="margin-bottom:12px">
+      <button class="${mode === "team" ? "on" : ""}" data-act="imgmode" data-v="team">${esc(T.name)}만</button>
+      <button class="${mode === "all" ? "on" : ""}" data-act="imgmode" data-v="all">전체 ${nTeams}팀</button></div>
+    <div class="imgprev"><img src="${cv.toDataURL("image/png")}" alt="스쿼드 이미지 미리보기"></div>
+    <div class="row" style="justify-content:flex-end;margin-top:12px;flex-wrap:wrap">
+      <button class="btn" data-act="close">닫기</button>
+      <button class="btn" data-act="imgcopy">이미지 복사</button>
+      <button class="btn pri" data-act="imgsave">이미지 저장</button></div>`);
+  document.querySelector("#modal .modal")?.classList.add("wide");
 }

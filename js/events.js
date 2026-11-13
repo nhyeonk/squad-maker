@@ -8,7 +8,7 @@ import { recognizeNames } from "./ocr.js";
 import { locate, removeFrom, movePlayer, autoPlace, relayoutAll, balanceSplit, fillEmpty, teamPlayers, poolList, currentSlots, setSlotLayout, resetSlotLayout } from "./lineup.js";
 import { nearestLabel } from "./formations.js";
 import { createMatchFromLineup, createBlankMatch, addGoal, removeGoal, addToMatch, removeFromMatch, updateMatchField } from "./matches.js";
-import { lineupText, saveSquadImage, exportBackup, importBackup, mergeData } from "./share.js";
+import { lineupText, saveCanvasImage, copyCanvasImage, exportBackup, importBackup, mergeData } from "./share.js";
 import * as M from "./views/modals.js";
 import { render } from "./render.js";
 import { $, copyText, toast } from "./utils.js";
@@ -230,7 +230,10 @@ const actions = {
     commitLineup();
     toast(`${added}명 추가했어요`);
   },
-  img: () => saveSquadImage(),
+  img: () => M.openImage(),
+  imgmode: (v) => M.openImage(v),
+  imgsave: () => saveCanvasImage(S.ui.imgCanvas, S.ui.imgMode),
+  imgcopy: () => copyCanvasImage(S.ui.imgCanvas),
   copytext: () => copyText(lineupText()),
 
   /* ----- 경기 ----- */
