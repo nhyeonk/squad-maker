@@ -4,7 +4,7 @@ import { POS, POS_KO, POSITION_GROUPS } from "../formations.js";
 import { computeStats, scoreOf } from "../stats.js";
 import { teamPlayers, currentSlots } from "../lineup.js";
 import { getCfg, groupId } from "../store.js";
-import { GROUP_ID } from "../config.js";
+import { GROUP_ID, APP_VERSION } from "../config.js";
 import { $, esc, fmtDate, todayStr } from "../utils.js";
 import { dot } from "./common.js";
 
@@ -121,7 +121,8 @@ export function openSettings() {
   S.ui.settingsOpen = true;
   const c = getCfg();
   const backup = `<div class="sec" style="margin-top:16px"><label>백업</label><div class="grid2">
-    <button class="btn" data-act="export">백업 파일 저장</button><button class="btn" data-act="import" data-edit>백업 불러오기</button></div></div>`;
+    <button class="btn" data-act="export">백업 파일 저장</button><button class="btn" data-act="import" data-edit>백업 불러오기</button></div></div>
+    <p class="hint" style="text-align:center">스쿼드 메이커 ${APP_VERSION}</p>`;
 
   if (S.mode === "remote") {
     return openModal(`<h2>설정${closeBtn}</h2>

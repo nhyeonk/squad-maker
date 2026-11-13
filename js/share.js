@@ -80,22 +80,24 @@ export async function saveSquadImage() {
     const x = px + (pw * s.x) / 100, y = py + (ph * s.y) / 100, pid = T.slots[i];
     c.beginPath();
     c.arc(x, y, 42, 0, 7);
-    c.fillStyle = pid ? "#fff" : "rgba(0,0,0,.2)";
+    c.fillStyle = pid ? POS_COLOR[s.role] : "rgba(0,0,0,.2)";
     c.fill();
     c.lineWidth = 6;
-    c.strokeStyle = POS_COLOR[s.role];
+    c.strokeStyle = pid ? "#fff" : POS_COLOR[s.role];
     c.stroke();
-    c.fillStyle = pid ? POS_COLOR[s.role] : "#fff";
+    c.fillStyle = pid ? (s.role === "GK" ? "#3a2c00" : "#fff") : "#fff";
     c.font = font("800 22px");
     c.fillText(s.label, x, y);
     if (pid) {
       const n = pname(pid);
       c.font = font("800 30px");
       const tw = c.measureText(n).width + 22;
-      c.fillStyle = "rgba(0,0,0,.55)";
+      c.fillStyle = "#1f2a24";
       c.beginPath();
-      c.roundRect ? c.roundRect(x - tw / 2, y + 50, tw, 44, 10) : c.rect(x - tw / 2, y + 50, tw, 44);
+      c.roundRect ? c.roundRect(x - tw / 2, y + 50, tw, 44, 8) : c.rect(x - tw / 2, y + 50, tw, 44);
       c.fill();
+      c.fillStyle = T.color;
+      c.fillRect(x - tw / 2 + 4, y + 90, tw - 8, 5);
       c.fillStyle = "#fff";
       c.fillText(n, x, y + 73);
     }

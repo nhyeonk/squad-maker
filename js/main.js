@@ -28,7 +28,15 @@ if (cfg) {
 
 // 홈 화면에 설치 (PWA)
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-  navigator.serviceWorker.register("sw.js").catch(() => {});
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register("sw.js").then((reg) => reg.update()).catch(() => {});
+  // 새 버전이 설치되면 한 번 자동 새로고침
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (hadController && !sessionStorage.getItem("sw-reloaded")) {
+      sessionStorage.setItem("sw-reloaded", "1");
+      location.reload();
+    }
+  });
 }
 
 window.__S = S; // 디버깅용

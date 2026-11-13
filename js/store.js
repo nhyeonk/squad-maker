@@ -5,6 +5,7 @@ import { toast } from "./utils.js";
 
 let FB = null; // { db, fs, au, auth, gid }
 let lineupTimer;
+let lineupDirty = false;
 
 const plain = (o) => JSON.parse(JSON.stringify(o)); // Firestore는 undefined를 못 받아요
 
@@ -63,7 +64,11 @@ export const api = {
   putLineup() {
     if (!FB) return saveLocal();
     clearTimeout(lineupTimer);
-    lineupTimer = setTimeout(() => remote(() => FB.fs.setDoc(ref("meta", "lineup"), plain(S.lineup))), 500);
+    lineupDirty = true; // 저장 전까지는 서버에서 온 예전 라인업으로 덮어쓰지 않아요
+    lineupTimer = setTimeout(async () => {
+      await remote(() => FB.fs.setDoc(ref("meta", "lineup"), plain(S.lineup)));
+      lineupDirty = false;
+    }, 400);
   },
 };
 
@@ -280,7 +285,7 @@ export async function initFirebase(cfg) {
   fs.onSnapshot(col("players"), (snap) => { S.players = toObj(snap); loadedOne(); hooks.scheduleRender(); }, onErr);
   fs.onSnapshot(col("matches"), (snap) => { S.matches = toObj(snap); loadedOne(); hooks.scheduleRender(); }, onErr);
   fs.onSnapshot(ref("meta", "lineup"), (d) => {
-    if (!d.metadata.hasPendingWrites) S.lineup = d.exists() ? d.data() : S.lineup || defaultLineup();
+    if (!d.metadata.hasPendingWrites && !lineupDirty) S.lineup = d.exists() ? d.data() : S.lineup || defaultLineup();
     loadedOne();
     hooks.scheduleRender();
   }, onErr);

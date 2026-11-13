@@ -3,7 +3,7 @@ import { S, P, pname, lineup } from "../state.js";
 import { FORMATIONS, FUTSAL_MAX } from "../formations.js";
 import { currentSlots, teamPlayers, poolList, locate } from "../lineup.js";
 import { esc } from "../utils.js";
-import { attendanceCounts } from "../stats.js";
+import { attendanceCounts, computeStats } from "../stats.js";
 import { posBadge, dot } from "./common.js";
 
 const isSel = (pid) => S.ui.sel === pid;
@@ -14,26 +14,43 @@ function pitchLines(futsal) {
     ? L("left:4%;right:4%;top:3%;bottom:3%") +
         L("left:4%;right:4%;top:50%;height:0;border-width:2px 0 0") +
         L("left:50%;top:50%;width:26%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%)") +
+        `<div class="spot"></div>` +
         L("left:22%;right:22%;top:3%;height:13%;border-top:0;border-radius:0 0 50% 50%") +
         L("left:22%;right:22%;bottom:3%;height:13%;border-bottom:0;border-radius:50% 50% 0 0")
     : L("left:3%;right:3%;top:2%;bottom:2%") +
         L("left:3%;right:3%;top:50%;height:0;border-width:2px 0 0") +
         L("left:50%;top:50%;width:26%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%)") +
+        `<div class="spot"></div>` +
         L("left:20%;right:20%;top:2%;height:16%;border-top:0") +
         L("left:36%;right:36%;top:2%;height:6%;border-top:0") +
         L("left:20%;right:20%;bottom:2%;height:16%;border-bottom:0") +
         L("left:36%;right:36%;bottom:2%;height:6%;border-bottom:0");
 }
 
+/** 동그라미 오른쪽 위 숫자: 출전 / 골 / 공격포인트 / 끄기 */
+export const BADGES = [
+  ["apps", "출전"],
+  ["goals", "골"],
+  ["ap", "공격P"],
+  ["none", "숫자 끄기"],
+];
+function badgeValue(st, pid) {
+  const s = st[pid];
+  if (!s) return 0;
+  return { apps: s.apps, goals: s.goals, ap: s.goals + s.ast }[S.ui.badge] || 0;
+}
+
 function pitch(l, T, slots) {
   const sel = S.ui.sel;
+  const st = S.ui.badge === "none" ? {} : computeStats().st;
   const slotHtml = slots
     .map((s, i) => {
       const pid = T.slots[i];
       const p = pid && P(pid);
+      const n = p ? badgeValue(st, pid) : 0;
       return `<button class="slot ${p ? "filled" : ""} ${p && isSel(pid) ? "sel" : ""} ${sel && !p ? "target" : ""}"
-        style="left:${s.x}%;top:${s.y}%" data-act="slot" data-v="${i}" data-drag="${i}">
-        <span class="cir role-${s.role}">${p ? `<span class="rl role-${s.role}">${esc(s.label)}</span>` : esc(s.label)}</span>
+        style="left:${s.x}%;top:${s.y}%;--tc:${T.color}" data-act="slot" data-v="${i}" data-drag="${i}">
+        <span class="cir role-${s.role}">${p ? `<span class="rl">${esc(s.label)}</span>${n ? `<span class="nb">${n}</span>` : ""}` : esc(s.label)}</span>
         ${p ? `<span class="nm">${esc(p.name)}</span>` : ""}</button>`;
     })
     .join("");
@@ -157,6 +174,7 @@ export function viewLineup() {
       <select class="in" data-chg="size" ${dis}>${sizes.map((n) => `<option value="${n}" ${n === l.size ? "selected" : ""}>${n} vs ${n}${n === 5 ? " (풋살)" : ""}</option>`).join("")}</select>
       <label class="lb">포메이션</label>
       <select class="in" data-chg="formation" ${dis}>${FORMATIONS[l.size].map((f) => `<option ${f === l.formation ? "selected" : ""}>${f}</option>`).join("")}</select>
+      <select class="in" data-chg="badge" title="동그라미 숫자">${BADGES.map(([k, t]) => `<option value="${k}" ${S.ui.badge === k ? "selected" : ""}>${k === "none" ? t : "숫자: " + t}</option>`).join("")}</select>
       <button class="iconbtn" data-act="autoplace" title="선호 포지션대로 다시 배치" data-edit><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12a9 9 0 109-9 9.7 9.7 0 00-6.7 2.8L3 8"/><path d="M3 3v5h5"/></svg></button>
     </div>
     <div class="pitchwrap">${pitch(l, T, slots)}${side(l, T)}</div>

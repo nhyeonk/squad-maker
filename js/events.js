@@ -649,7 +649,14 @@ export function bindEvents() {
 
   document.addEventListener("change", (e) => {
     const el = e.target.closest("[data-chg]");
-    if (!el || !S.canEdit) return;
+    if (!el) return;
+    if (el.dataset.chg === "badge") {
+      // 보기 설정이라 보기 전용이어도 바꿀 수 있어요 (이 폰에만 저장)
+      S.ui.badge = el.value;
+      try { localStorage.setItem("squadmaker_badge", el.value); } catch {}
+      return render();
+    }
+    if (!S.canEdit) return;
     const k = el.dataset.chg;
     if (k.startsWith("m.")) {
       updateMatchField(k.slice(2), el.value.trim());

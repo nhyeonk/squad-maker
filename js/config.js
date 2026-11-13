@@ -25,3 +25,6 @@ export const FIREBASE_SDK_VERSION = "10.12.2";
 /** localStorage 키 */
 export const STORAGE_KEY = "squadmaker_v1";
 export const CONFIG_KEY = "squadmaker_cfg";
+
+/** 앱 버전 (⚙️ 설정 맨 아래에 보여요. 수정해서 올릴 때마다 sw.js의 VERSION과 같이 올려 주세요) */
+export const APP_VERSION = "v11";

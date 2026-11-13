@@ -205,3 +205,18 @@ details.others summary{font-size:12.5px;color:var(--sub);font-weight:700;cursor:
 .pg{padding:10px 4px;border-radius:9px;background:var(--soft);font-weight:800;font-size:13.5px}
 .pg.on.FW{background:var(--fw);color:#fff}.pg.on.MF{background:var(--mf);color:#fff}
 .pg.on.DF{background:var(--df);color:#fff}.pg.on.GK{background:var(--gk);color:#3a2c00}
+/* 선수 표시 (포지션 색 동그라미 + 숫자 배지 + 팀 색 이름표) */
+.slot{width:80px;gap:4px}
+.slot .cir{position:relative;width:40px;height:40px;border:2px dashed currentColor;background:rgba(0,0,0,.16);font-size:10.5px;letter-spacing:-.2px}
+.slot.filled .cir{border:2.5px solid #fff;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.28)}
+.slot.filled .cir.role-FW{background:var(--fw)}
+.slot.filled .cir.role-MF{background:var(--mf)}
+.slot.filled .cir.role-DF{background:var(--df)}
+.slot.filled .cir.role-GK{background:var(--gk);color:#3a2c00}
+.slot .rl{font-size:10.5px;font-weight:900;color:inherit}
+.slot .nb{position:absolute;top:-7px;right:-8px;min-width:19px;height:19px;padding:0 4px;border-radius:99px;background:#fff;color:#1d1d1b;
+  font-size:11px;font-weight:900;display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.slot .nm{background:#1f2a24;color:#fff;font-size:12px;padding:2px 7px 1px;border-radius:5px;border-bottom:3px solid var(--tc,#e5484d);max-width:80px}
+.slot.sel .cir{transform:scale(1.12);box-shadow:0 0 0 4px #ffe066,0 2px 6px rgba(0,0,0,.3)}
+.pitch .spot{position:absolute;left:50%;top:50%;width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.8);transform:translate(-50%,-50%)}
+@media (max-width:520px){.slot{width:66px}.slot .cir{width:36px;height:36px}.slot .rl{font-size:9.5px}.slot .nm{font-size:11px;max-width:66px}}

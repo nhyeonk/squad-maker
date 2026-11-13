@@ -1,6 +1,6 @@
 // 서비스 워커: 앱 파일을 캐시해서 오프라인에서도 열리게 해요.
 // 앱 파일을 수정해 배포할 때는 VERSION 숫자를 올려 주세요. (폰에 새 버전이 반영돼요)
-const VERSION = "v9";
+const VERSION = "v11";
 const CACHE = `squadmaker-${VERSION}`;
 const APP_FILES = [
   "./",
@@ -31,7 +31,11 @@ const APP_FILES = [
 ];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(APP_FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(CACHE)
+      .then((c) => c.addAll(APP_FILES.map((u) => new Request(u, { cache: "reload" }))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener("activate", (e) => {
@@ -47,7 +51,7 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, { cache: "no-cache" }) // 브라우저 캐시 말고 항상 최신 파일 확인
       .then((res) => {
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(e.request, copy));

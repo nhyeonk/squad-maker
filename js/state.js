@@ -23,7 +23,10 @@ export const S = {
   players: {},
   matches: {},
   lineup: null,
-  ui: { tab: "lineup", team: 0, sel: null, matchId: null, sort: "goals", period: "all" },
+  ui: {
+    tab: "lineup", team: 0, sel: null, matchId: null, sort: "goals", period: "all",
+    badge: (() => { try { return localStorage.getItem("squadmaker_badge") || "apps"; } catch { return "apps"; } })(),
+  },
   mode: "local", // "local" | "remote"
   canEdit: true,
   user: null,
