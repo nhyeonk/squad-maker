@@ -27,6 +27,8 @@ export const S = {
   mode: "local", // "local" | "remote"
   canEdit: true,
   user: null,
+  recorders: null, // { owner, emails[] } (Firebase 모드)
+  isOwner: false,
   ready: false,
 };
 

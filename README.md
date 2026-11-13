@@ -67,20 +67,20 @@
 
 ## 2. Firebase 연결 (친구들과 실시간 공유) — 약 5분
 
-1. [Firebase 콘솔](https://console.firebase.google.com)에서 **프로젝트 추가** (구글 애널리틱스는 꺼도 돼요)
-2. **빌드 → Firestore Database → 데이터베이스 만들기** → 위치 `asia-northeast3 (서울)` → **프로덕션 모드**
-3. **규칙** 탭에 이 저장소의 `firestore.rules` 내용을 붙여넣고, `recorder@example.com`을 기록자 이메일로 바꾼 뒤 **게시**
-4. **빌드 → Authentication → 시작하기 → 로그인 방법: 이메일/비밀번호** 사용 설정
-5. **Authentication → Users → 사용자 추가**로 기록자 계정(3번에 적은 이메일 + 비밀번호)을 만들기
-6. **프로젝트 설정(⚙️) → 일반 → 내 앱 → 웹(</>)** 으로 앱 등록 → 나오는 `firebaseConfig`를 복사
-7. 연결 방법은 둘 중 하나:
-   - **(추천) 코드에 넣기**: `js/config.js`의 `FIREBASE_CONFIG = null`을 복사한 값으로 바꾸고 커밋·푸시.
-     그러면 사이트 주소만 공유해도 모두 자동 연결돼요.
-   - **앱에서 붙여넣기**: 앱의 ⚙️ 설정 → 붙여넣기 → 연결하기 → **공유 링크 복사**로 만든 링크를 단톡방에 공유
-8. 기록자는 ⚙️ 설정에서 5번 계정으로 로그인하면 입력할 수 있어요. 나머지 사람은 **보기 전용**이에요.
+1. [Firebase 콘솔](https://console.firebase.google.com)에서 **프로젝트 만들기** (Gemini·애널리틱스는 꺼도 돼요)
+2. **Firestore → 데이터베이스 만들기** → Standard 에디션 → ID는 그대로 `(default)` → 위치 `asia-northeast3 (서울)` → **프로덕션 모드**
+3. **Firestore → 규칙** 탭에 `firestore.rules` 내용을 붙여넣고, `owner@example.com`을 **관리자(본인) 이메일**로 바꾼 뒤 **게시**
+   - 규칙은 이번 한 번만 고치면 돼요. 기록자 추가/삭제는 앱에서 해요.
+4. **Authentication → 시작하기 → 로그인 방법 → Google** 사용 설정
+5. **Authentication → 설정 → 승인된 도메인**에 사이트 주소 추가 (예: `내아이디.github.io`)
+6. **프로젝트 설정(⚙️) → 일반 → 내 앱 → 웹(</>)** 으로 앱 등록 → `firebaseConfig` 복사
+7. `js/config.js`의 `FIREBASE_CONFIG = null`을 복사한 값으로 바꾸고 커밋·푸시
+   (또는 앱의 ⚙️ 설정에 붙여넣고 "공유 링크 복사"로 만든 링크를 공유)
+8. 앱 ⚙️ 설정 → **구글로 로그인** → **👑 이 계정을 관리자로 등록** (처음 한 번)
+9. ⚙️ 설정 → **기록자 관리**에 친구 구글 이메일 추가 → 친구는 구글로 로그인만 하면 바로 입력 가능
 
-> Firebase 웹 설정값(apiKey 등)은 비밀번호가 아니라 깃허브에 올려도 괜찮아요. 쓰기 권한은 `firestore.rules`가 막아줘요.
-> 무료 요금제(Spark)로 동네 모임 규모는 충분해요.
+> 로그인하지 않은 사람은 모두 **보기 전용**이에요. Firebase 웹 설정값(apiKey 등)은 비밀번호가 아니라 깃허브에 올려도 괜찮아요.
+> 쓰기 권한은 `firestore.rules`가 지켜요. 무료 요금제(Spark)로 동네 모임 규모는 충분해요.
 
 **기존에 폰에 저장해 둔 기록**은 기록자로 로그인한 뒤 ⚙️ 설정 → "이 폰에 저장된 기록을 서버로 합치기"로 올릴 수 있어요.
 
@@ -95,6 +95,7 @@
 groups/{그룹ID}/players/{선수ID}   { name, pos: ["MF","FW"], skill: 3 }
 groups/{그룹ID}/matches/{경기ID}   { date, title, referee, status, teams[2], goals[] }
 groups/{그룹ID}/meta/lineup        현재 라인업 (참가자, 팀 배치)
+recorders/{그룹ID}                  { owner: 관리자 이메일, emails: [기록자 이메일] }
 ```
 
 `js/config.js`의 `GROUP_ID`를 바꾸면 같은 Firebase 프로젝트로 여러 모임을 따로 운영할 수 있어요.

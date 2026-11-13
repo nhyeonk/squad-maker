@@ -1,25 +1,49 @@
 rules_version = '2';
 
 // 스쿼드 메이커 보안 규칙
-// - 누구나 읽기 가능 (링크만 있으면 친구들이 로그인 없이 기록을 봐요)
-// - 쓰기는 아래 목록에 있는 기록자 이메일로 로그인한 사람만
+// - 누구나 기록을 볼 수 있어요 (링크만 있으면 로그인 없이)
+// - 기록 입력은 관리자 + 관리자가 앱에서 추가한 기록자만
+// - 기록자 명단(recorders)은 관리자만 바꿀 수 있어요
 //
-// Firebase 콘솔 → Firestore Database → 규칙(Rules) 탭에 통째로 붙여넣고 "게시"를 누르세요.
-// 기록자 이메일은 Authentication → 사용자 추가에서 만든 계정과 똑같이 적어야 해요.
+// ★ 아래 OWNER 이메일 한 곳만 본인 이메일로 바꾸고,
+//   Firebase 콘솔 → Firestore → 규칙 탭에 통째로 붙여넣은 뒤 "게시"를 누르세요.
+//   이후 기록자 추가/삭제는 앱의 ⚙️ 설정에서 해요. (이 파일은 다시 안 고쳐도 돼요)
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isRecorder() {
-      return request.auth != null
-        && request.auth.token.email in [
-          'recorder@example.com'   // ← 기록자 이메일로 바꾸세요. 여러 명이면 쉼표로 추가
-        ];
+    function myEmail() {
+      return request.auth.token.email.lower();
     }
 
+    function signedIn() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && request.auth.token.email_verified == true;
+    }
+
+    function isOwner() {
+      return signedIn() && myEmail() == 'owner@example.com';   // ← 관리자 이메일
+    }
+
+    function isRecorder(groupId) {
+      return isOwner() || (
+        signedIn()
+        && exists(/databases/$(database)/documents/recorders/$(groupId))
+        && myEmail() in get(/databases/$(database)/documents/recorders/$(groupId)).data.emails
+      );
+    }
+
+    // 기록자 명단: 로그인한 사람은 (내 권한 확인용으로) 읽기, 관리자만 쓰기
+    match /recorders/{groupId} {
+      allow read: if signedIn();
+      allow write: if isOwner();
+    }
+
+    // 선수, 경기, 라인업
     match /groups/{groupId}/{document=**} {
       allow read: if true;
-      allow write: if isRecorder();
+      allow write: if isRecorder(groupId);
     }
   }
 }

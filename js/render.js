@@ -4,6 +4,7 @@ import { $ } from "./utils.js";
 import { viewLineup, viewSelbar } from "./views/lineup.js";
 import { viewMatchList, viewMatch } from "./views/matches.js";
 import { viewPlayers } from "./views/players.js";
+import { openSettings } from "./views/modals.js";
 
 function renderChrome() {
   const sync = $("#sync");
@@ -16,7 +17,7 @@ function renderChrome() {
 
   $("#banner").innerHTML =
     S.mode === "remote" && !S.canEdit
-      ? `<div class="banner"><span class="sp">보기 전용이에요. 기록을 입력하려면 기록자 계정으로 로그인하세요.</span><button class="btn sm ghost" data-act="settings">로그인</button></div>`
+      ? `<div class="banner"><span class="sp">보기 전용이에요. 기록을 입력하려면 ⚙️ 설정에서 로그인하세요.</span><button class="btn sm ghost" data-act="settings">로그인</button></div>`
       : "";
 
   $("#foot").innerHTML =
@@ -40,6 +41,8 @@ export function render() {
     app.innerHTML = m ? viewMatch(m) : viewMatchList();
   } else app.innerHTML = viewPlayers();
   $("#selbar").innerHTML = viewSelbar();
+  // 로그인·권한이 바뀌면 열려 있는 설정 창도 새로 그려요
+  if (S.ui.settingsOpen && !document.activeElement?.closest?.("#modal input")) openSettings();
 }
 
 /** 실시간 업데이트가 와도 입력 중이면 기다렸다가 다시 그려요 (입력 끊김 방지) */

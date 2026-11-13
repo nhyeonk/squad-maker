@@ -117,9 +117,46 @@ export function shareLink() {
   return base + "#join=" + b64e(JSON.stringify({ c: c.config, g: c.gid }));
 }
 
-/* ---------- 로그인 (기록자) ---------- */
+/* ---------- 로그인 & 기록자 권한 ----------
+ * 기록자 명단은 Firestore의 recorders/{그룹ID} 문서에 있어요: { owner: 관리자이메일, emails: [기록자 이메일...] }
+ * 관리자 이메일만 firestore.rules에 한 번 적어 두고, 나머지 기록자는 앱 설정에서 추가/삭제해요.
+ */
 export const login = (email, pw) => FB.au.signInWithEmailAndPassword(FB.auth, email, pw);
 export const logout = () => FB.au.signOut(FB.auth);
+
+export async function loginGoogle() {
+  const provider = new FB.au.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  try {
+    await FB.au.signInWithPopup(FB.auth, provider);
+  } catch (e) {
+    // 홈 화면 앱(PWA)이나 팝업 차단 환경에서는 페이지 이동 방식으로
+    if (["auth/popup-blocked", "auth/operation-not-supported-in-this-environment", "auth/cancelled-popup-request"].includes(e.code)) {
+      return FB.au.signInWithRedirect(FB.auth, provider);
+    }
+    throw e;
+  }
+}
+
+const myEmail = () => (S.user?.email || "").toLowerCase();
+
+function updatePermission() {
+  const e = myEmail();
+  const r = S.recorders;
+  S.isOwner = !!e && !!r && r.owner === e;
+  S.canEdit = !!e && !!r && (r.owner === e || (r.emails || []).includes(e));
+}
+
+const recordersRef = () => FB.fs.doc(FB.db, "recorders", FB.gid);
+
+/** 처음 한 번: 이 계정을 관리자로 등록 (firestore.rules에 적은 관리자만 성공해요) */
+export async function claimOwner() {
+  await FB.fs.setDoc(recordersRef(), { owner: myEmail(), emails: [] });
+}
+export async function setRecorders(emails) {
+  const r = S.recorders;
+  await FB.fs.setDoc(recordersRef(), { owner: r.owner, emails: [...new Set(emails.map((x) => x.trim().toLowerCase()).filter(Boolean))] });
+}
 
 /* ---------- Firebase 연결 & 실시간 구독 ---------- */
 export async function initFirebase(cfg) {
@@ -141,9 +178,31 @@ export async function initFirebase(cfg) {
   S.mode = "remote";
   S.canEdit = false;
 
+  au.getRedirectResult(auth).catch((e) => console.warn(e));
+  let unsubRec = null;
   au.onAuthStateChanged(auth, (u) => {
     S.user = u;
-    S.canEdit = !!u;
+    S.recorders = null;
+    updatePermission();
+    unsubRec?.();
+    unsubRec = null;
+    if (u) {
+      S.recordersLoaded = false;
+      unsubRec = fs.onSnapshot(
+        recordersRef(),
+        (d) => {
+          S.recorders = d.exists() ? d.data() : null;
+          S.recordersLoaded = true;
+          updatePermission();
+          hooks.render();
+        },
+        (e) => {
+          console.warn(e);
+          S.recordersLoaded = true;
+          hooks.render();
+        }
+      );
+    }
     hooks.render();
   });
 

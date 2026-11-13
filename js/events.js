@@ -1,7 +1,7 @@
 // 버튼·입력 이벤트 처리
 // HTML의 data-act="이름" 버튼을 누르면 아래 actions["이름"]이 실행돼요. (data-v 값이 v로 들어와요)
 import { S, P, lineup, defaultLineup, mkTeam } from "./state.js";
-import { api, parseConfig, saveCfg, clearCfg, shareLink, login, logout, loadLocal } from "./store.js";
+import { api, parseConfig, saveCfg, clearCfg, shareLink, login, logout, loginGoogle, claimOwner, setRecorders, loadLocal } from "./store.js";
 import { FORMATIONS } from "./formations.js";
 import { ensurePlayer, findByName, parseNames } from "./players.js";
 import { recognizeNames } from "./ocr.js";
@@ -349,9 +349,32 @@ const actions = {
     location.reload();
   },
   share: () => copyText(shareLink()),
-  logout() {
-    logout();
-    M.closeModal();
+  async logout() {
+    await logout();
+    M.openSettings();
+  },
+  async googlelogin() {
+    try {
+      await loginGoogle();
+      toast("로그인했어요");
+    } catch (e) {
+      console.error(e);
+      toast(e.code === "auth/unauthorized-domain" ? "이 주소가 Firebase 승인된 도메인에 없어요 (README 참고)" : e.code === "auth/popup-closed-by-user" ? "로그인을 취소했어요" : "로그인 실패: " + (e.code || e.message));
+    }
+  },
+  async claimowner() {
+    try {
+      await claimOwner();
+      toast("관리자로 등록했어요");
+      setTimeout(M.openSettings, 400);
+    } catch (e) {
+      toast(e.code === "permission-denied" ? "firestore.rules에 적은 관리자 이메일이 아니에요" : "실패: " + (e.code || e.message));
+    }
+  },
+  async recdel(v) {
+    if (!confirm(`${v}을(를) 기록자에서 뺄까요?`)) return;
+    await setRecorders((S.recorders.emails || []).filter((x) => x !== v)).catch((e) => toast("실패: " + e.code));
+    M.openSettings();
   },
   async upload() {
     const d = loadLocal();
@@ -403,6 +426,17 @@ const forms = {
     if (!p) return;
     render();
     M.openPlayer(p.id);
+  },
+  async recadd(f) {
+    const email = f.n.value.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast("이메일 형식을 확인하세요");
+    try {
+      await setRecorders([...(S.recorders.emails || []), email]);
+      toast("기록자를 추가했어요");
+      M.openSettings();
+    } catch (e) {
+      toast("실패: " + (e.code || e.message));
+    }
   },
   async login(f) {
     try {
@@ -461,7 +495,7 @@ export function bindEvents() {
     const f = e.target;
     const fn = forms[f.dataset.act];
     if (!fn) return;
-    if (f.dataset.act !== "login" && !S.canEdit) return toast("보기 전용이에요");
+    if (!["login", "recadd"].includes(f.dataset.act) && !S.canEdit) return toast("보기 전용이에요");
     await fn(f);
     if (f.n) f.n.value = "";
   });
