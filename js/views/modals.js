@@ -199,7 +199,7 @@ function accountSection() {
   if (!S.recordersLoaded) status = `<p class="hint">권한 확인 중…</p>`;
   else if (S.isOwner) status = `<p class="hint">👑 관리자예요. 아래에서 기록자를 관리하세요.</p>`;
   else if (S.canEdit) status = `<p class="hint">✏️ 기록자예요. 기록을 입력할 수 있어요.</p>`;
-  else if (!S.recorders)
+  else if (!S.recorders && !S.recordersDenied)
     status = `<p class="hint">아직 관리자가 없어요. firestore.rules에 적은 관리자 이메일이라면 아래 버튼을 누르세요.</p>
       <button class="btn pri block" data-act="claimowner">👑 이 계정을 관리자로 등록</button>`;
   else status = `<p class="hint">👀 보기 전용이에요. 관리자에게 <b>${email}</b>을(를) 기록자로 추가해 달라고 하세요.</p>`;

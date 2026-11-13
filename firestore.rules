@@ -23,7 +23,7 @@ service cloud.firestore {
     }
 
     function isOwner() {
-      return signedIn() && myEmail() == 'owner@example.com';   // ← 관리자 이메일
+      return signedIn() && myEmail() == 'ehdrnch@gmail.com';   // ← 관리자 이메일
     }
 
     function isRecorder(groupId) {
@@ -34,9 +34,9 @@ service cloud.firestore {
       );
     }
 
-    // 기록자 명단: 로그인한 사람은 (내 권한 확인용으로) 읽기, 관리자만 쓰기
+    // 기록자 명단: 관리자와 명단에 있는 기록자만 읽기 (다른 사람에겐 이메일이 안 보여요), 관리자만 쓰기
     match /recorders/{groupId} {
-      allow read: if signedIn();
+      allow read: if isOwner() || (signedIn() && myEmail() in resource.data.emails);
       allow write: if isOwner();
     }
 

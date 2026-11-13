@@ -188,6 +188,7 @@ export async function initFirebase(cfg) {
     unsubRec = null;
     if (u) {
       S.recordersLoaded = false;
+      S.recordersDenied = false;
       unsubRec = fs.onSnapshot(
         recordersRef(),
         (d) => {
@@ -197,8 +198,10 @@ export async function initFirebase(cfg) {
           hooks.render();
         },
         (e) => {
+          // 기록자 명단에 없는 사람은 명단을 못 읽어요 → 보기 전용
           console.warn(e);
           S.recordersLoaded = true;
+          S.recordersDenied = e.code === "permission-denied";
           hooks.render();
         }
       );
