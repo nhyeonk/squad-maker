@@ -6,7 +6,7 @@ import { FORMATIONS } from "./formations.js";
 import { ensurePlayer, findByName, parseNames } from "./players.js";
 import { recognizeNames } from "./ocr.js";
 import { locate, removeFrom, movePlayer, autoPlace, relayoutAll, balanceSplit, fillEmpty, teamPlayers, poolList, currentSlots, setSlotLayout, resetSlotLayout } from "./lineup.js";
-import { nearestLabel } from "./formations.js";
+import { nearestLabel, roleOfLabel } from "./formations.js";
 import { createMatchFromLineup, createBlankMatch, addGoal, removeGoal, addToMatch, removeFromMatch, updateMatchField } from "./matches.js";
 import { lineupText, saveCanvasImage, copyCanvasImage, exportBackup, importBackup, mergeData } from "./share.js";
 import * as M from "./views/modals.js";
@@ -24,7 +24,7 @@ function commitLineup() {
 const EDIT_ONLY = new Set([
   "tobench", "toteam", "topool", "attend", "unattend", "split", "fill", "clearteam", "resetall", "addteam", "delteam",
   "autoplace", "startmatch", "newmatch", "goal", "delgoal", "mstatus", "delmatch", "mrmplayer", "maddplayer",
-  "posopen", "posset", "posreset", "bulkstart", "bulkdelete", "ppos", "pskill", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply", "pregular", "attendregulars", "rostertoggle",
+  "posopen", "posset", "posreset", "bulkstart", "bulkdelete", "ppos", "pdetail", "pskill", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply", "pregular", "attendregulars", "rostertoggle",
 ]);
 
 const actions = {
@@ -313,12 +313,35 @@ const actions = {
 
   /* ----- 선수 ----- */
   newplayer: () => M.openNewPlayer(),
+  /* 선호 포지션: 안 고른 걸 누르면 선택 + 세부 포지션 열기 → 열린 걸 다시 누르면 해제 */
   async ppos(v) {
     const [pid, r] = v.split(":");
-    const pos = [...(P(pid).pos || [])];
-    const i = pos.indexOf(r);
-    i >= 0 ? pos.splice(i, 1) : pos.push(r);
-    await api.putPlayer({ ...P(pid), pos });
+    const p = P(pid);
+    const pos = [...(p.pos || [])];
+    let detail = [...(p.detail || [])];
+    const open = S.ui.posOpen?.pid === pid && S.ui.posOpen.role === r;
+    if (!pos.includes(r)) {
+      pos.push(r);
+      S.ui.posOpen = { pid, role: r };
+    } else if (!open && r !== "GK") {
+      S.ui.posOpen = { pid, role: r };
+      return M.openPlayer(pid);
+    } else {
+      pos.splice(pos.indexOf(r), 1);
+      detail = detail.filter((d) => roleOfLabel(d) !== r);
+      S.ui.posOpen = null;
+    }
+    await api.putPlayer({ ...p, pos, detail });
+    M.openPlayer(pid);
+    render();
+  },
+  async pdetail(v) {
+    const [pid, d] = v.split(":");
+    const p = P(pid);
+    const detail = [...(p.detail || [])];
+    const i = detail.indexOf(d);
+    i >= 0 ? detail.splice(i, 1) : detail.push(d);
+    await api.putPlayer({ ...p, detail });
     M.openPlayer(pid);
     render();
   },
@@ -659,8 +682,108 @@ function bindPitchDrag() {
   });
 }
 
+/* ---------- 대기 명단·후보·팀 명단에서 선수 끌어오기 ---------- */
+/** 경기장 (x,y)에 선수 놓기: 가장 가까운 빈자리를 그 위치로 옮겨서 넣어요. 빈자리가 없으면 가장 가까운 선수와 교체 */
+function dropPlayerOnPitch(pid, pt) {
+  const t = S.ui.team;
+  const T = lineup().teams[t];
+  const slots = currentSlots(t);
+  const dist = (s) => Math.hypot(s.x - pt.x, (s.y - pt.y) * 0.68);
+  const hit = slots.findIndex((s) => dist(s) < 6); // 동그라미 바로 위
+  if (hit >= 0) return movePlayer(pid, { kind: "slot", team: t, slot: hit });
+  const empty = slots.map((s, i) => i).filter((i) => !T.slots[i]);
+  if (empty.length) {
+    const i = empty.sort((a, b) => dist(slots[a]) - dist(slots[b]))[0];
+    movePlayer(pid, { kind: "slot", team: t, slot: i });
+    setSlotLayout(t, i, { x: Math.round(pt.x * 10) / 10, y: Math.round(pt.y * 10) / 10, label: nearestLabel(pt.x, pt.y) });
+  } else {
+    const i = slots.map((s, k) => k).sort((a, b) => dist(slots[a]) - dist(slots[b]))[0];
+    movePlayer(pid, { kind: "slot", team: t, slot: i });
+  }
+}
+
+let pdrag = null;
+function bindPlayerDrag() {
+  const start = (d, e) => {
+    d.active = true;
+    d.ghost = document.createElement("div");
+    d.ghost.className = "dragghost";
+    d.ghost.textContent = P(d.pid)?.name || "";
+    document.body.appendChild(d.ghost);
+    document.body.classList.add("pdragging");
+    navigator.vibrate?.(15);
+    move(e);
+  };
+  const move = (e) => {
+    if (!pdrag?.ghost) return;
+    pdrag.ghost.style.left = e.clientX + "px";
+    pdrag.ghost.style.top = e.clientY + "px";
+    document.querySelectorAll(".dropover").forEach((el) => el.classList.remove("dropover"));
+    pdrag.ghost.style.display = "none";
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    pdrag.ghost.style.display = "";
+    under?.closest("[data-drop], #pitch, [data-pdrag]")?.classList.add("dropover");
+  };
+  const finish = (e) => {
+    const d = pdrag;
+    pdrag = null;
+    clearTimeout(d.timer);
+    if (!d.active) return;
+    d.ghost.remove();
+    document.body.classList.remove("pdragging");
+    document.querySelectorAll(".dropover").forEach((el) => el.classList.remove("dropover"));
+    suppressClick = true;
+    setTimeout(() => (suppressClick = false), 60);
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    if (!under) return;
+    const other = under.closest("[data-pdrag]")?.dataset.pdrag;
+    const slotEl = under.closest("#pitch [data-drag]");
+    const zone = under.closest("[data-drop]")?.dataset.drop;
+    if (slotEl) movePlayer(d.pid, { kind: "slot", team: S.ui.team, slot: +slotEl.dataset.drag });
+    else if (under.closest("#pitch")) dropPlayerOnPitch(d.pid, pitchPoint(e));
+    else if (other && other !== d.pid) movePlayer(d.pid, { kind: "player", pid: other });
+    else if (zone === "bench") movePlayer(d.pid, { kind: "bench", team: S.ui.team });
+    else if (zone === "pool") movePlayer(d.pid, { kind: "pool" });
+    else if (zone?.startsWith("team:")) movePlayer(d.pid, { kind: "team", team: +zone.slice(5) });
+    else return render();
+    commitLineup();
+  };
+
+  document.addEventListener("pointerdown", (e) => {
+    const el = e.target.closest("[data-pdrag]");
+    if (!el || !S.canEdit || e.button > 0 || e.target.closest(".x")) return;
+    pdrag = { pid: el.dataset.pdrag, sx: e.clientX, sy: e.clientY, id: e.pointerId, touch: e.pointerType !== "mouse", active: false };
+    // 폰: 살짝 길게 누르면 끌기 시작 (그냥 쓸면 스크롤)
+    if (pdrag.touch) pdrag.timer = setTimeout(() => pdrag && !pdrag.active && start(pdrag, { clientX: pdrag.sx, clientY: pdrag.sy }), 250);
+  });
+  document.addEventListener("pointermove", (e) => {
+    if (!pdrag || e.pointerId !== pdrag.id) return;
+    const far = Math.hypot(e.clientX - pdrag.sx, e.clientY - pdrag.sy) > 8;
+    if (!pdrag.active) {
+      if (!far) return;
+      if (pdrag.touch) { clearTimeout(pdrag.timer); pdrag = null; return; } // 길게 누르기 전에 움직이면 스크롤
+      start(pdrag, e);
+    }
+    e.preventDefault();
+    move(e);
+  }, { passive: false });
+  // 끄는 중에는 화면 스크롤 막기
+  document.addEventListener("touchmove", (e) => { if (pdrag?.active) e.preventDefault(); }, { passive: false });
+  document.addEventListener("pointerup", (e) => pdrag && e.pointerId === pdrag.id && finish(e));
+  document.addEventListener("pointercancel", (e) => {
+    if (!pdrag || e.pointerId !== pdrag.id) return;
+    const d = pdrag;
+    pdrag = null;
+    clearTimeout(d.timer);
+    if (d.active) { d.ghost.remove(); document.body.classList.remove("pdragging"); render(); }
+  });
+  // 길게 누를 때 뜨는 메뉴 막기
+  document.addEventListener("contextmenu", (e) => { if (e.target.closest("[data-pdrag]") && S.canEdit) e.preventDefault(); });
+}
+
 export function bindEvents() {
   bindPitchDrag();
+  bindPlayerDrag();
   document.addEventListener("click", async (e) => {
     const el = e.target.closest("[data-act]");
     if (!el || el.tagName === "FORM") return;

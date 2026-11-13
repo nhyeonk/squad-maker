@@ -36,17 +36,29 @@ export function parseNames(text) {
     .filter((s) => s.length && s.length <= 20);
 }
 
-/** 선호 포지션이 해당 자리와 얼마나 맞는지 (팀 배치 점수) */
-export function fit(pid, role) {
+/** 세부 포지션이 자리 이름과 맞는지 (LCM/RCM ↔ CM, LS/RS ↔ ST 처럼 비슷한 것도 인정) */
+const DETAIL_ALIKE = {
+  ST: ["ST", "LS", "RS", "CF"], CF: ["CF", "ST", "LS", "RS"], SS: ["SS", "CF", "CAM"],
+  LW: ["LW", "LF"], RW: ["RW", "RF"],
+  CAM: ["CAM", "LAM", "RAM", "SS"], CM: ["CM", "LCM", "RCM"], CDM: ["CDM", "LDM", "RDM"],
+  LM: ["LM", "LW"], RM: ["RM", "RW"],
+  CB: ["CB", "LCB", "RCB", "SW"], LB: ["LB", "LWB"], RB: ["RB", "RWB"], LWB: ["LWB", "LB", "LM"], RWB: ["RWB", "RB", "RM"],
+};
+
+/** 선호 포지션이 해당 자리와 얼마나 맞는지 (팀 배치 점수). label을 주면 세부 포지션까지 봐요 */
+export function fit(pid, role, label) {
   const p = S.players[pid];
   if (!p) return 0;
   const pos = p.pos || [];
+  let v;
   const i = pos.indexOf(role);
-  if (i === 0) return 4;
-  if (i === 1) return 2.5;
-  if (i >= 2) return 1.2;
-  if (role === "GK") return pos.length ? -3 : -1; // 골키퍼는 원하는 사람 우선
-  return pos.length ? 0 : 0.5;
+  if (i === 0) v = 4;
+  else if (i === 1) v = 2.5;
+  else if (i >= 2) v = 1.2;
+  else if (role === "GK") v = pos.length ? -3 : -1; // 골키퍼는 원하는 사람 우선
+  else v = pos.length ? 0 : 0.5;
+  if (label && (p.detail || []).some((d) => (DETAIL_ALIKE[d] || [d]).includes(label))) v += 1.5;
+  return v;
 }
 
 /* ---------- 비슷한 이름 찾기 (사진 인식 오타 바로잡기) ---------- */

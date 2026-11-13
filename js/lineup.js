@@ -78,7 +78,7 @@ export function movePlayer(pid, dest) {
     const slots = currentSlots(dest.team);
     const free = slots.map((_, i) => i).filter((i) => !T.slots[i]);
     if (free.length) {
-      free.sort((a, b) => fit(pid, slots[b].role) - fit(pid, slots[a].role));
+      free.sort((a, b) => fit(pid, slots[b].role, slots[b].label) - fit(pid, slots[a].role, slots[a].label));
       T.slots[free[0]] = pid;
     } else T.bench.push(pid);
     return;
@@ -109,7 +109,7 @@ export function autoPlace(teamIdx, pids) {
   T.slots = {};
   T.bench = [];
   const pairs = [];
-  pids.forEach((p) => slots.forEach((s, i) => pairs.push({ p, i, v: fit(p, s.role) + Math.random() * 0.3 })));
+  pids.forEach((p) => slots.forEach((s, i) => pairs.push({ p, i, v: fit(p, s.role, s.label) + Math.random() * 0.3 })));
   pairs.sort((a, b) => b.v - a.v);
   const used = new Set();
   for (const x of pairs) {
@@ -184,7 +184,7 @@ export function fillEmpty(teamIdx) {
   if (!pool.length) return false;
   const free = slots.map((_, i) => i).filter((i) => !T.slots[i]);
   const pairs = [];
-  pool.forEach((p) => free.forEach((i) => pairs.push({ p, i, v: fit(p, slots[i].role) + Math.random() * 0.3 })));
+  pool.forEach((p) => free.forEach((i) => pairs.push({ p, i, v: fit(p, slots[i].role, slots[i].label) + Math.random() * 0.3 })));
   pairs.sort((a, b) => b.v - a.v);
   const used = new Set();
   for (const x of pairs) {

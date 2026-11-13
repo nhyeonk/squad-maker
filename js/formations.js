@@ -35,6 +35,13 @@ export const POSITION_GROUPS = {
   DF: ["LWB", "LB", "LCB", "CB", "RCB", "RB", "RWB", "SW"],
   GK: ["GK"],
 };
+/** 선수 선호 포지션에서 고를 수 있는 세부 포지션 (공격/미드/수비 버튼을 누르면 나와요) */
+export const PREF_DETAIL = {
+  FW: ["LW", "ST", "CF", "RW", "SS"],
+  MF: ["CAM", "LM", "CM", "RM", "CDM"],
+  DF: ["LB", "LWB", "CB", "RB", "RWB"],
+  GK: [],
+};
 const ROLE_OF = {};
 for (const [role, list] of Object.entries(POSITION_GROUPS)) list.forEach((l) => (ROLE_OF[l] = role));
 export const roleOfLabel = (label) => ROLE_OF[String(label).toUpperCase()] || "MF";

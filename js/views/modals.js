@@ -1,6 +1,6 @@
 // 팝업 창들: 선수 정보, 골 입력, 경기 시작, 출전 선수 추가, 설정
 import { S, P, pname, lineup } from "../state.js";
-import { POS, POS_KO, POSITION_GROUPS } from "../formations.js";
+import { POS, POS_KO, POSITION_GROUPS, PREF_DETAIL, roleOfLabel } from "../formations.js";
 import { computeStats, scoreOf } from "../stats.js";
 import { teamPlayers, currentSlots } from "../lineup.js";
 import { renderSquadCanvas } from "../share.js";
@@ -42,15 +42,24 @@ export function openPlayer(pid) {
     })
     .join("");
 
+  const open = S.ui.posOpen?.pid === pid ? S.ui.posOpen.role : null;
   const posBtns = POS.map((r) => {
     const i = (p.pos || []).indexOf(r);
-    return `<button class="${r} ${i >= 0 ? "on" : ""}" data-act="ppos" data-v="${pid}:${r}" ${dis}>${POS_KO[r]}${i >= 0 ? `<i>${i + 1}</i>` : ""}</button>`;
+    return `<button class="${r} ${i >= 0 ? "on" : ""} ${open === r ? "open" : ""}" data-act="ppos" data-v="${pid}:${r}" ${dis}>${POS_KO[r]}${i >= 0 ? `<i>${i + 1}</i>` : ""}</button>`;
   }).join("");
+  // 공격/미드/수비를 누르면 아래에 세부 포지션이 작게 나와요
+  const detail = p.detail || [];
+  const detailRow = open && PREF_DETAIL[open].length
+    ? `<div class="pdetail ${open}"><span class="pdl">${POS_KO[open]}</span>${PREF_DETAIL[open]
+        .map((d) => `<button class="${detail.includes(d) ? "on" : ""}" data-act="pdetail" data-v="${pid}:${d}" ${dis}>${d}</button>`)
+        .join("")}</div>`
+    : "";
+  const chosen = detail.length ? `<div class="pchosen">선호: ${detail.map((d) => `<span class="pb ${roleOfLabel(d)}">${d}</span>`).join(" ")}</div>` : "";
   const stars = [1, 2, 3, 4, 5].map((n) => `<button class="${n <= (p.skill || 3) ? "on" : ""}" data-act="pskill" data-v="${pid}:${n}" ${dis}>★</button>`).join("");
 
   openModal(`<h2>${ed ? `<input class="in" id="pnm" value="${esc(p.name)}" style="font-weight:800;font-size:17px">` : esc(p.name)}${closeBtn}</h2>
     <div class="sec"><button class="btn block ${p.regular ? "pri" : "ghost"}" data-act="pregular" data-v="${pid}" ${dis}>${p.regular ? "⭐ 고정 참여 (눌러서 해제)" : "☆ 고정 참여로 지정"}</button></div>
-    <div class="sec"><label>선호 포지션 · 누른 순서가 우선순위예요</label><div class="posbtns">${posBtns}</div></div>
+    <div class="sec"><label>선호 포지션 · 누른 순서가 우선순위예요 (다시 누르면 해제)</label><div class="posbtns">${posBtns}</div>${detailRow}${chosen}</div>
     <div class="sec"><label>실력 (팀 밸런스용)</label><div class="stars">${stars}</div></div>
     <div class="sec"><label>기록</label>
       <div style="font-size:14px;font-weight:700">${s.apps || 0}경기 · ${s.goals || 0}골 · ${s.ast || 0}도움 · ${s.w || 0}승 ${s.d || 0}무 ${s.l || 0}패</div>${hist}</div>
