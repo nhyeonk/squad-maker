@@ -12,7 +12,7 @@ export const TEAM_COLORS = [
 
 /**
  * 데이터 구조
- * players: { [id]: { id, name, pos: ["MF","FW"] (선호 순서), detail: ["CM","ST"] (세부 선호 포지션), skill: 1~5, regular: 고정 참여 여부, createdAt } }
+ * players: { [id]: { id, name, pos: ["MF","FW"] (선호 순서), detail: ["CM","ST"] (세부 선호 포지션), skill: 1~5 (F,C,B,A,S) 또는 null, regular: 고정 참여 여부, createdAt } }
  * matches: { [id]: { id, date, title, referee, size, formation, status: "live"|"done",
  *                    teams: [{ name, color, players: [id], roles: { [id]: "GK"|"DF"|"MF"|"FW"|"SUB" } } x2],
  *                    goals: [{ id, team: 0|1, scorer, assist, og, t }], createdAt, updatedAt } }
