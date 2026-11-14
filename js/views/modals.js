@@ -2,20 +2,23 @@
 import { S, P, pname, lineup } from "../state.js";
 import { POS, POS_KO, POSITION_GROUPS, PREF_DETAIL, roleOfLabel } from "../formations.js";
 import { computeStats, scoreOf } from "../stats.js";
-import { teamPlayers, currentSlots } from "../lineup.js";
+import { teamPlayers, currentSlots, previewBalance } from "../lineup.js";
+import { TIERS, playerTier } from "../players.js";
 import { renderSquadCanvas } from "../share.js";
 import { getCfg, groupId } from "../store.js";
 import { GROUP_ID, APP_VERSION } from "../config.js";
 import { $, esc, fmtDate, todayStr } from "../utils.js";
-import { dot } from "./common.js";
+import { dot, tierBadge, tierSelect } from "./common.js";
 
 export function openModal(html) {
   S.ui.settingsOpen = false;
+  S.ui.balanceDraft = null;
   $("#modal").innerHTML = `<div class="mask" data-act="maskclose"><div class="modal">${html}</div></div>`;
 }
 export function closeModal() {
   $("#modal").innerHTML = "";
   S.ui.settingsOpen = false;
+  S.ui.balanceDraft = null;
 }
 const closeBtn = `<span class="sp"></span><button class="btn sm" data-act="close">닫기</button>`;
 
@@ -55,12 +58,10 @@ export function openPlayer(pid) {
         .join("")}</div>`
     : "";
   const chosen = detail.length ? `<div class="pchosen">선호: ${detail.map((d) => `<span class="pb ${roleOfLabel(d)}">${d}</span>`).join(" ")}</div>` : "";
-  const stars = [1, 2, 3, 4, 5].map((n) => `<button class="${n <= (p.skill || 3) ? "on" : ""}" data-act="pskill" data-v="${pid}:${n}" ${dis}>★</button>`).join("");
-
   openModal(`<h2>${ed ? `<input class="in" id="pnm" value="${esc(p.name)}" style="font-weight:800;font-size:17px">` : esc(p.name)}${closeBtn}</h2>
     <div class="sec"><button class="btn block ${p.regular ? "pri" : "ghost"}" data-act="pregular" data-v="${pid}" ${dis}>${p.regular ? "⭐ 고정 참여 (눌러서 해제)" : "☆ 고정 참여로 지정"}</button></div>
     <div class="sec"><label>선호 포지션 · 누른 순서가 우선순위예요 (다시 누르면 해제)</label><div class="posbtns">${posBtns}</div>${detailRow}${chosen}</div>
-    <div class="sec"><label>실력 (팀 밸런스용)</label><div class="stars">${stars}</div></div>
+    <div class="sec"><label for="player-tier">티어 (팀 밸런스용)</label>${ed ? tierSelect(p, "player", "player-tier") : tierBadge(pid) || "미지정"}</div>
     <div class="sec"><label>기록</label>
       <div style="font-size:14px;font-weight:700">${s.apps || 0}경기 · ${s.goals || 0}골 · ${s.ast || 0}도움 · ${s.w || 0}승 ${s.d || 0}무 ${s.l || 0}패</div>${hist}</div>
     ${ed ? `<div class="row"><button class="btn pri" data-act="psave" data-v="${pid}" style="flex:1">이름 저장</button><button class="btn danger" data-act="pdel" data-v="${pid}">선수 삭제</button></div>` : ""}`);
@@ -254,21 +255,94 @@ function recordersSection() {
 }
 
 /* ---------- 고정 참여 명단 ---------- */
+const normalizedName = (name) => name.trim().normalize().toLowerCase();
+export function filterRoster(query) {
+  const search = normalizedName(query);
+  const rows = [...document.querySelectorAll("#modal [data-roster-name]")];
+  for (const row of rows) row.hidden = !normalizedName(row.dataset.rosterName).includes(search);
+  const empty = $("#roster-search-empty");
+  if (empty) empty.hidden = !search || rows.some((row) => !row.hidden);
+}
+
+export function updateRosterTier(select) {
+  select.closest(".roster-entry").querySelector("[data-roster-tier]").innerHTML = tierBadge(select.dataset.pid);
+}
+
 export function openRoster() {
+  const query = $("#modal [data-roster-search]")?.value || "";
   const all = Object.values(S.players).sort((a, b) => a.name.localeCompare(b.name, "ko"));
   const regs = all.filter((p) => p.regular);
   const others = all.filter((p) => !p.regular);
   const ed = S.canEdit;
+  const entry = (p) => `<div class="roster-entry" data-roster-name="${esc(p.name)}">
+    <button class="chip ${p.regular ? "sel" : "ghost"}" data-act="rostertoggle" data-v="${esc(p.id)}" ${ed ? "" : "disabled"}>
+      ${p.regular ? "⭐" : "+"} ${esc(p.name)}${p.regular && ed ? '<span class="x">×</span>' : ""}</button>
+    <span data-roster-tier>${tierBadge(p.id)}</span>${ed ? tierSelect(p, "roster") : ""}
+  </div>`;
   openModal(`<h2>⭐ 고정 참여 명단 <span class="badge">${regs.length}명</span>${closeBtn}</h2>
     <p class="hint" style="margin:0 0 12px">매주 오는 사람을 넣어 두면 라인업 탭에서 <b>고정 참여 모두 추가</b> 한 번으로 참가자가 채워져요.</p>
     ${ed ? `<form class="row" data-act="rosteradd"><input class="in" name="n" placeholder="이름 (여러 명은 쉼표로)" autocomplete="off"><button class="btn pri">추가</button></form>
       <button class="btn kakao block" style="margin-top:8px" data-act="ocr" data-v="roster">📷 카톡 캡처로 명단 만들기</button>` : ""}
+    ${all.length ? `<input type="search" class="in roster-search" data-roster-search placeholder="선수 이름 검색" aria-label="선수 이름 검색" value="${esc(query)}">
+      <p class="hint" id="roster-search-empty" hidden>검색 결과가 없어요.</p>` : ""}
     <div class="sec" style="margin-top:14px"><label>고정 참여 ${regs.length}명${ed ? " · 눌러서 빼기" : ""}</label>
-      ${regs.length ? `<div class="chips">${regs.map((p) => `<button class="chip sel" data-act="rostertoggle" data-v="${p.id}" ${ed ? "" : "disabled"}>⭐ ${esc(p.name)}${ed ? `<span class="x">×</span>` : ""}</button>`).join("")}</div>`
+      ${regs.length ? `<div class="roster-list">${regs.map(entry).join("")}</div>`
         : `<div class="empty">아직 비어 있어요. 이름을 넣거나 카톡 캡처로 만들어 보세요.</div>`}</div>
     ${others.length ? `<div class="sec"><label>다른 선수${ed ? " · 눌러서 고정 참여로" : ""}</label>
-      <div class="chips">${others.map((p) => `<button class="chip ghost" data-act="rostertoggle" data-v="${p.id}" ${ed ? "" : "disabled"}>+ ${esc(p.name)}</button>`).join("")}</div></div>` : ""}
+      <div class="roster-list">${others.map(entry).join("")}</div></div>` : ""}
     <button class="btn block" data-act="close">완료</button>`);
+  if (query) filterRoster(query);
+}
+
+/* ---------- 티어 균형 배정 ---------- */
+export function openBalance() {
+  const l = lineup();
+  const players = [...new Set(l.attendees)].filter(P).sort((a, b) => pname(a).localeCompare(pname(b), "ko"));
+  const options = l.teams.map((team, i) =>
+    `<option value="${i}">${esc(team.name)}</option>` +
+    (currentSlots(i).some((s) => s.role === "GK") ? `<option value="${i}:GK">${esc(team.name)} · 골키퍼</option>` : "")
+  ).join("");
+  const hasKeepers = l.teams.some((team, i) => players.includes(team.slots[currentSlots(i).findIndex((s) => s.role === "GK")]));
+  openModal(`<h2>티어 균형 배정${closeBtn}</h2>
+    <p class="hint">인원, 티어와 선호 포지션을 반영해요. 미지정 선수는 B 점수로 계산해요.</p>
+    <div id="balance-preview" class="balance-teams" aria-live="polite"></div>
+    <details class="sec balance-locks"><summary>선수·골키퍼 고정</summary>
+      ${hasKeepers ? '<button class="btn sm ghost" data-act="balancekeepers">현재 골키퍼 고정</button>' : ""}
+      <div class="roster-list">${players.map((id) => `<label class="balance-lock">
+        <span>${tierBadge(id)} ${esc(pname(id))}</span><select class="in" data-chg="balancelock" data-pid="${esc(id)}" aria-label="${esc(pname(id))} 고정">
+          <option value="">자동 배정</option>${options}</select></label>`).join("")}</div>
+    </details>
+    <div class="grid2"><button class="btn" data-act="balancereroll">다시 섞기</button>
+    <button class="btn pri" data-act="balanceapply">이 배정 적용</button></div>`);
+  updateBalance();
+}
+
+export function updateBalance() {
+  const output = $("#balance-preview");
+  if (!output) return;
+  const fields = [...output.closest(".modal").querySelectorAll('[data-chg="balancelock"]')];
+  const locks = new Map(fields.filter((field) => field.value).map((field) => [
+    field.dataset.pid, { team: Number(field.value.split(":")[0]), keeper: field.value.endsWith(":GK") },
+  ]));
+  const { teams, error } = previewBalance(locks);
+  S.ui.balanceDraft = { teams, source: JSON.stringify(lineup()), players: lineup().attendees.map((id) => [id, P(id)]) };
+  $('[data-act="balanceapply"]').disabled = !teams;
+  output.innerHTML = error ? `<p class="hint">${esc(error)}</p>` : teams.map((team, i) => {
+    const slots = currentSlots(i);
+    const counts = {};
+    for (const id of teamPlayers(team)) {
+      const tier = playerTier(P(id));
+      counts[tier] = (counts[tier] || 0) + 1;
+    }
+    const summary = [...TIERS, ""].filter((t) => counts[t]).map((t) => `${t || "미지정"} ${counts[t]}`).join(" · ");
+    const names = Object.entries(team.slots).map(([slot, id]) =>
+      `${esc(pname(id))}${slots[slot].role === "GK" ? " (GK)" : ""}`).join(", ");
+    return `<div class="balance-team"><b>${dot(team.color)} ${esc(team.name)}</b>
+      <small>선발 ${Object.keys(team.slots).length} · 후보 ${team.bench.length}</small>
+      ${summary ? `<div class="balance-tiers">${summary}</div>` : ""}
+      ${names ? `<div>${names}</div>` : ""}
+      ${team.bench.length ? `<div>후보 · ${team.bench.map((id) => esc(pname(id))).join(", ")}</div>` : ""}</div>`;
+  }).join("");
 }
 
 /* ---------- 포지션 고르기 ---------- */

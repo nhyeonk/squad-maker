@@ -3,6 +3,7 @@ import { S, P, pname } from "../state.js";
 import { computeStats, recommendedPos } from "../stats.js";
 import { POS_KO, roleOfLabel } from "../formations.js";
 import { esc } from "../utils.js";
+import { tierBadge } from "./common.js";
 
 const SORTS = [
   ["goals", "득점"],
@@ -53,7 +54,7 @@ export function viewPlayers() {
       const prefs = prefList.map(([t, r]) => `<span class="pb ${r}" style="margin:0 1px">${t}</span>`).join("");
       const first = bulk ? `<span class="ck ${picked.has(s.id) ? "on" : ""}">${picked.has(s.id) ? "✓" : ""}</span>` : s.apps ? rank : "";
       return `<tr class="click ${bulk && picked.has(s.id) ? "picked" : ""}" data-act="${bulk ? "bulktoggle" : "info"}" data-v="${s.id}">
-        <td>${first}</td><td class="nm">${esc(pname(s.id))}${P(s.id).regular ? " ⭐" : ""}</td>
+        <td>${first}</td><td class="nm">${tierBadge(s.id)} ${esc(pname(s.id))}${P(s.id).regular ? " ⭐" : ""}</td>
         <td>${rp ? `<span class="pb ${rp}" style="font-size:11px;padding:2px 7px">${POS_KO[rp]}</span>` : "-"}</td>
         <td>${prefs || `<span style="color:var(--mute)">-</span>`}</td>
         <td>${s.apps || "-"}</td><td>${dec ? `${s.w}-${s.d}-${s.l}` : "-"}</td><td>${dec ? Math.round((s.w / dec) * 100) + "%" : "-"}</td>

@@ -3,9 +3,9 @@
 import { S, P, lineup, defaultLineup, mkTeam } from "./state.js";
 import { api, parseConfig, saveCfg, clearCfg, shareLink, login, logout, loginGoogle, claimOwner, setRecorders, loadLocal, requestAccess, cancelRequest, approveRequest, rejectRequest } from "./store.js";
 import { FORMATIONS } from "./formations.js";
-import { ensurePlayer, findByName, parseNames } from "./players.js";
+import { TIERS, ensurePlayer, findByName, parseNames, playerTier, skillForTier } from "./players.js";
 import { recognizeNames } from "./ocr.js";
-import { locate, removeFrom, movePlayer, autoPlace, relayoutAll, balanceSplit, fillEmpty, teamPlayers, poolList, currentSlots, setSlotLayout, resetSlotLayout } from "./lineup.js";
+import { locate, removeFrom, movePlayer, autoPlace, relayoutAll, fillEmpty, teamPlayers, poolList, currentSlots, setSlotLayout, resetSlotLayout } from "./lineup.js";
 import { nearestLabel, roleOfLabel } from "./formations.js";
 import { createMatchFromLineup, createBlankMatch, addGoal, removeGoal, addToMatch, removeFromMatch, updateMatchField } from "./matches.js";
 import { lineupText, saveCanvasImage, copyCanvasImage, exportBackup, importBackup, mergeData } from "./share.js";
@@ -24,7 +24,8 @@ function commitLineup() {
 const EDIT_ONLY = new Set([
   "tobench", "toteam", "topool", "attend", "unattend", "split", "fill", "clearteam", "resetall", "addteam", "delteam",
   "autoplace", "startmatch", "newmatch", "goal", "delgoal", "mstatus", "delmatch", "mrmplayer", "maddplayer",
-  "posopen", "posset", "posreset", "bulkstart", "bulkdelete", "ppos", "pdetail", "pskill", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply", "pregular", "attendregulars", "rostertoggle",
+  "posopen", "posset", "posreset", "bulkstart", "bulkdelete", "ppos", "pdetail", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply", "pregular", "attendregulars", "rostertoggle",
+  "balanceapply", "balancereroll", "balancekeepers",
 ]);
 
 const actions = {
@@ -119,9 +120,32 @@ const actions = {
     commitLineup();
   },
   split() {
-    if (!balanceSplit()) return toast("참가자를 먼저 추가하세요");
+    if (new Set(lineup().attendees.filter(P)).size < 2) return toast("참가자를 두 명 이상 추가하세요");
+    M.openBalance();
+  },
+  balanceapply() {
+    const draft = S.ui.balanceDraft;
+    if (!draft?.teams) return;
+    if (JSON.stringify(lineup()) !== draft.source || draft.players.some(([id, p]) => P(id) !== p)) {
+      M.openBalance();
+      return toast("라인업이나 선수 정보가 바뀌어 다시 계산했어요");
+    }
+    lineup().teams = draft.teams;
+    M.closeModal();
     commitLineup();
-    toast(`${lineup().teams.length}팀으로 나눴어요. 선수를 눌러 바꿀 수 있어요`);
+    toast(`${lineup().teams.length}팀으로 균형 배정했어요`);
+  },
+  balancereroll: () => M.updateBalance(),
+  balancekeepers() {
+    const selects = [...document.querySelectorAll('[data-chg="balancelock"]')];
+    lineup().teams.forEach((team, i) => {
+      const pid = team.slots[currentSlots(i).findIndex((s) => s.role === "GK")];
+      const field = selects.find((select) => select.dataset.pid === pid);
+      if (!field) return;
+      for (const select of selects) if (select.value === `${i}:GK`) select.value = String(i);
+      field.value = `${i}:GK`;
+    });
+    M.updateBalance();
   },
   fill() {
     if (!fillEmpty(S.ui.team)) return toast("대기 명단이 비어 있어요");
@@ -357,12 +381,6 @@ const actions = {
     commitLineup();
     toast(`고정 참여 ${ids.length}명 추가했어요`);
   },
-  async pskill(v) {
-    const [pid, n] = v.split(":");
-    await api.putPlayer({ ...P(pid), skill: +n });
-    M.openPlayer(pid);
-    render();
-  },
   async psave(v) {
     const n = $("#pnm").value.trim();
     if (!n) return;
@@ -596,6 +614,19 @@ const forms = {
 
 /* ----- 값 변경 (select, input) ----- */
 const changes = {
+  async ptier(el) {
+    const { pid, source } = el.dataset;
+    if (!P(pid) || (el.value && !TIERS.includes(el.value))) return;
+    el.disabled = true;
+    await api.putPlayerSkill(pid, skillForTier(el.value));
+    if (el.isConnected && S.canEdit) {
+      el.disabled = false;
+      el.value = playerTier(P(pid));
+      if (source === "roster") M.updateRosterTier(el);
+    }
+    render();
+  },
+  balancelock: () => M.updateBalance(),
   size(el) {
     const l = lineup();
     l.size = +el.value;
@@ -896,6 +927,7 @@ export function bindEvents() {
 
   // 사진 인식 결과에서 이름 고치기 (다시 그리지 않고 그 자리에서 표시만 바꿔요)
   document.addEventListener("input", (e) => {
+    if (e.target.matches("[data-roster-search]")) return M.filterRoster(e.target.value);
     const oi = e.target.closest("[data-ocr-i]");
     if (!oi || !S.ui.ocr) return;
     const i = +oi.dataset.ocrI;

@@ -85,6 +85,42 @@ label.lb{font-size:12.5px;color:var(--sub);font-weight:600}
 .chip .x{opacity:.5;font-size:15px;line-height:1;padding-left:2px}
 .chip.add{background:#fff;border:1.5px dashed var(--line);color:var(--sub)}
 .chip.ghost{background:#fff;border:1px solid var(--line);color:var(--sub);font-weight:600}
+.roster-tools input{width:100%;font-size:16px}
+.tier-field{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700}
+.tier-select{font-size:13px;padding:5px 6px}
+.balance-button{grid-column:1/-1}
+.balance-preview,.balance-lock-list{display:grid;gap:6px}
+.balance-team{padding:8px 10px;border:1px solid var(--line);border-radius:9px;overflow-wrap:anywhere}
+.balance-team small,.balance-names{font-size:12px;color:var(--muted)}
+.balance-tiers{font-size:13px;font-weight:700;color:var(--accent);margin:3px 0}
+.balance-locks{margin:12px 0;font-size:13px}
+.balance-locks summary{font-weight:700;cursor:pointer}
+.balance-locks .mini-btn{margin-top:8px}
+.balance-lock-list{max-height:220px;overflow:auto;margin-top:8px}
+.balance-lock{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:38px;overflow-wrap:anywhere}
+.balance-lock select{max-width:52%;min-width:0}
+.tier-badge{
+  position:relative;isolation:isolate;display:inline-grid;place-items:center;flex:none;width:25px;height:16px;
+  clip-path:polygon(5px 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%,0 5px);
+  background:linear-gradient(180deg,var(--tier-rim),var(--tier-edge) 60%,var(--tier-rim));color:var(--tier-ink);
+  font-size:11px;font-weight:900;line-height:1;letter-spacing:0;vertical-align:middle;
+}
+.tier-badge::before{
+  content:"";position:absolute;inset:1px;z-index:-1;
+  clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);
+.slot .tier-badge{position:absolute;top:-7px;left:-7px}
+.tier-select.in{width:auto;min-width:68px;padding:4px 7px;font-size:13px}
+.roster-search.in{margin-top:12px}
+.roster-list,.balance-teams{display:grid;gap:6px}
+.roster-entry,.balance-lock{display:flex;align-items:center;gap:8px}
+.roster-entry[hidden]{display:none}
+.roster-entry .chip,.balance-lock>span{flex:1;min-width:0;overflow-wrap:anywhere}
+.balance-lock select.in{width:auto;max-width:52%;min-width:0}
+.balance-locks summary{cursor:pointer;font-weight:700;margin-bottom:8px}
+.balance-locks .roster-list{max-height:210px;overflow:auto;margin-top:8px}
+.balance-team{border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;overflow-wrap:anywhere}
+.balance-team small{color:var(--sub);margin-left:5px}
+.balance-tiers{font-weight:800;margin:3px 0}
 .pb{font-size:10px;font-weight:800;padding:1px 5px;border-radius:5px;color:#fff;letter-spacing:.2px}
 .pb.FW{background:var(--fw)}.pb.MF{background:var(--mf)}.pb.DF{background:var(--df)}.pb.GK{background:var(--gk);color:#3a2c00}.pb.none{background:#c9c4b9}
 /* team roster cards */

@@ -21,8 +21,10 @@ export function loadLocal() {
 function saveLocal() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ players: S.players, matches: S.matches, lineup: S.lineup }));
+    return true;
   } catch {
     toast("저장 공간이 부족해요");
+    return false;
   }
 }
 
@@ -32,13 +34,29 @@ const ref = (...path) => FB.fs.doc(FB.db, "groups", FB.gid, ...path);
 async function remote(fn) {
   try {
     await fn();
+    return true;
   } catch (e) {
     console.error(e);
     toast(e.code === "permission-denied" ? "저장 권한이 없어요. 기록자 계정으로 로그인하세요." : "저장 실패: " + (e.code || e.message));
+    return false;
   }
 }
 
 export const api = {
+  async putPlayerSkill(id, skill) {
+    const previous = S.players[id];
+    if (!S.canEdit || !previous) return false;
+    if (FB) {
+      const connection = FB;
+      const saved = await remote(() => connection.fs.updateDoc(ref("players", id), { skill }));
+      if (saved && FB === connection && S.players[id] === previous) S.players[id] = { ...previous, skill };
+      return saved;
+    }
+    S.players[id] = { ...previous, skill };
+    if (saveLocal()) return true;
+    S.players[id] = previous;
+    return false;
+  },
   putPlayer(p) {
     S.players[p.id] = p;
     if (FB) return remote(() => FB.fs.setDoc(ref("players", p.id), plain(p)));

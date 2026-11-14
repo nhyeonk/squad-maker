@@ -1,7 +1,7 @@
 // 라인업 로직: 선수 이동/교체, 자동 배치, 밸런스 팀 나누기
 import { S, P, lineup } from "./state.js";
 import { formationSlots, roleOfLabel } from "./formations.js";
-import { fit } from "./players.js";
+import { balanceSkill, fit, playerTier } from "./players.js";
 import { shuffle } from "./utils.js";
 
 /**
@@ -104,20 +104,22 @@ export function movePlayer(pid, dest) {
 
 /** 선호 포지션에 맞게 팀 안에서 자리 배치 (남는 인원은 후보) */
 export function autoPlace(teamIdx, pids) {
-  const T = lineup().teams[teamIdx];
-  const slots = currentSlots(teamIdx);
-  T.slots = {};
-  T.bench = [];
+  Object.assign(lineup().teams[teamIdx], placePlayers(currentSlots(teamIdx), pids));
+}
+
+function placePlayers(slots, pids, keeper) {
+  const assigned = {};
+  if (keeper) assigned[keeper.slot] = keeper.id;
+  const used = new Set(Object.values(assigned));
   const pairs = [];
   pids.forEach((p) => slots.forEach((s, i) => pairs.push({ p, i, v: fit(p, s.role, s.label) + Math.random() * 0.3 })));
   pairs.sort((a, b) => b.v - a.v);
-  const used = new Set();
   for (const x of pairs) {
-    if (used.has(x.p) || T.slots[x.i]) continue;
-    T.slots[x.i] = x.p;
+    if (used.has(x.p) || assigned[x.i]) continue;
+    assigned[x.i] = x.p;
     used.add(x.p);
   }
-  pids.forEach((p) => !used.has(p) && T.bench.push(p));
+  return { slots: assigned, bench: pids.filter((p) => !used.has(p)) };
 }
 
 /** 인원·포메이션이 바뀌면 각 팀 선수를 새 자리에 다시 배치 */
@@ -129,51 +131,63 @@ export function relayoutAll() {
 }
 
 /**
- * 실력(★)과 선호 포지션을 고려해 참가자 전원을 팀 수만큼 나눠요.
- * 1) 골키퍼가 주 포지션인 사람은 팀마다 한 명씩
- * 2) 나머지는 실력 높은 순으로, 인원이 적은 팀 → 같은 포지션이 적은 팀 → 실력 합이 낮은 팀에 배정
- * 매번 약간의 무작위를 섞어 누를 때마다 조합이 달라져요.
+ * 현재 라인업을 변경하지 않고 팀 배정안을 계산해요.
+ * 고정 선수와 골키퍼를 먼저 넣은 뒤 인원, 점수, 티어와 포지션을 비교해요.
  */
-export function balanceSplit() {
+export function previewBalance(locks = new Map()) {
   const l = lineup();
-  const n = l.teams.length;
-  const all = l.attendees.filter((id) => P(id));
-  if (!all.length) return false;
-
-  const skill = (id) => P(id).skill || 3;
-  const jitter = (id) => skill(id) + Math.random() * 0.8;
+  const all = [...new Set(l.attendees)].filter(P);
+  if (all.length < 2) return { error: "참가자를 두 명 이상 추가하세요" };
   const primary = (id) => (P(id).pos || [])[0] || "X";
-  const buckets = Array.from({ length: n }, () => ({ ids: [], sum: 0, roles: {} }));
+  const buckets = l.teams.map((team, index) => ({
+    index, ids: [], sum: 0, roles: {}, tiers: {}, keeper: null, slots: currentSlots(index), team,
+  }));
   const add = (b, id) => {
+    const role = primary(id);
+    const tier = playerTier(P(id));
     b.ids.push(id);
-    b.sum += skill(id);
-    b.roles[primary(id)] = (b.roles[primary(id)] || 0) + 1;
+    b.sum += balanceSkill(id);
+    b.roles[role] = (b.roles[role] || 0) + 1;
+    b.tiers[tier] = (b.tiers[tier] || 0) + 1;
   };
-
-  const used = new Set();
-  shuffle(all.filter((id) => primary(id) === "GK"))
-    .sort((a, b) => jitter(b) - jitter(a))
-    .slice(0, n)
-    .forEach((id, i) => {
-      add(buckets[i], id);
-      used.add(id);
-    });
-
-  all
-    .filter((id) => !used.has(id))
-    .map((id) => ({ id, s: jitter(id) }))
-    .sort((a, b) => b.s - a.s)
-    .forEach(({ id }) => {
-      const minCount = Math.min(...buckets.map((b) => b.ids.length));
-      const role = primary(id);
-      const best = buckets
-        .filter((b) => b.ids.length === minCount)
-        .sort((a, b) => (a.roles[role] || 0) - (b.roles[role] || 0) || a.sum - b.sum)[0];
-      add(best, id);
-    });
-
-  buckets.forEach((b, i) => autoPlace(i, shuffle(b.ids)));
-  return true;
+  const reserveKeeper = (b, id, slot) => {
+    b.keeper = { id, slot };
+    add(b, id);
+  };
+  for (const id of all) {
+    const lock = locks.get(id);
+    if (!lock) continue;
+    const b = buckets[lock.team];
+    if (!b) return { error: "고정한 팀이 바뀌었어요. 배정을 다시 열어 주세요." };
+    if (!lock.keeper) {
+      add(b, id);
+      continue;
+    }
+    const slot = b.slots.findIndex((s) => s.role === "GK");
+    if (slot < 0) return { error: `${b.team.name}에 골키퍼 자리가 없어요.` };
+    if (b.keeper) return { error: `${b.team.name}의 골키퍼는 한 명만 고정할 수 있어요.` };
+    reserveKeeper(b, id, slot);
+  }
+  const pending = shuffle(all.filter((id) => !locks.has(id))).sort((a, b) => balanceSkill(b) - balanceSkill(a));
+  const available = shuffle([...buckets]).sort((a, b) => a.ids.length - b.ids.length);
+  for (const b of available) {
+    const slot = b.slots.findIndex((s) => s.role === "GK");
+    if (slot < 0 || b.keeper) continue;
+    const own = b.ids.find((id) => primary(id) === "GK");
+    const next = pending.findIndex((id) => primary(id) === "GK");
+    if (own) b.keeper = { id: own, slot };
+    else if (next !== -1 && b.ids.length < b.slots.length) reserveKeeper(b, pending.splice(next, 1)[0], slot);
+  }
+  for (const id of pending) {
+    const role = primary(id);
+    const tier = playerTier(P(id));
+    const eligible = available.filter((b) => b.ids.length < b.slots.length);
+    const sorted = (eligible.length ? eligible : [...available]).sort((a, b) =>
+      a.ids.length - b.ids.length || a.sum - b.sum ||
+      (a.tiers[tier] || 0) - (b.tiers[tier] || 0) || (a.roles[role] || 0) - (b.roles[role] || 0));
+    add(sorted[0], id);
+  }
+  return { teams: buckets.map((b) => ({ ...b.team, ...placePlayers(b.slots, b.ids, b.keeper) })) };
 }
 
 /** 대기 명단 선수로 지금 보는 팀의 빈자리 채우기 */
