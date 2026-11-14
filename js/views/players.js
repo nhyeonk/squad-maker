@@ -1,8 +1,9 @@
 // 선수 기록 탭 화면 (순위표)
 import { S, P, pname } from "../state.js";
 import { computeStats, recommendedPos } from "../stats.js";
-import { POS_KO, roleOfLabel } from "../formations.js";
+import { POS_KO } from "../formations.js";
 import { esc } from "../utils.js";
+import { prefList } from "./common.js";
 
 const SORTS = [
   ["goals", "득점"],
@@ -58,8 +59,7 @@ export function viewPlayers() {
       const dec = s.w + s.d + s.l;
       const pl = P(s.id);
       // 선호: 세부 포지션(ST, CM…)을 고른 게 있으면 그걸, 없으면 공격/미드/수비/GK
-      const prefList = (pl.detail || []).length ? pl.detail.map((d) => [d, roleOfLabel(d)]) : (pl.pos || []).map((r) => [r, r]);
-      const prefs = prefList.map(([t, r]) => `<span class="pb ${r}" style="margin:0 1px">${t}</span>`).join("");
+      const prefs = prefList(pl).map(([t, r]) => `<span class="pb ${r}" style="margin:0 1px">${t}</span>`).join("");
       const first = bulk ? `<span class="ck ${picked.has(s.id) ? "on" : ""}">${picked.has(s.id) ? "✓" : ""}</span>` : s.apps ? rank : "";
       return `<tr class="click ${bulk && picked.has(s.id) ? "picked" : ""}" data-act="${bulk ? "bulktoggle" : "info"}" data-v="${s.id}">
         <td>${first}</td><td class="nm">${esc(pname(s.id))}</td>

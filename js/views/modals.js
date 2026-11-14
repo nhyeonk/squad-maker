@@ -1,6 +1,6 @@
 // 팝업 창들: 선수 정보, 골 입력, 경기 시작, 출전 선수 추가, 설정
 import { S, P, pname, lineup } from "../state.js";
-import { POS, POS_KO, POSITION_GROUPS, PREF_DETAIL, roleOfLabel } from "../formations.js";
+import { POS, POS_KO, POSITION_GROUPS, PREF_DETAIL } from "../formations.js";
 import { computeStats, scoreOf } from "../stats.js";
 import { teamPlayers, currentSlots } from "../lineup.js";
 import { renderSquadCanvas } from "../share.js";
@@ -8,7 +8,7 @@ import { defaultMatchTitle, recentPlaces, shortDate } from "../matches.js";
 import { getCfg, groupId } from "../store.js";
 import { GROUP_ID, APP_VERSION } from "../config.js";
 import { $, esc, fmtDate, todayStr } from "../utils.js";
-import { dot } from "./common.js";
+import { dot, prefList } from "./common.js";
 
 export function openModal(html) {
   S.ui.settingsOpen = false;
@@ -55,7 +55,8 @@ export function openPlayer(pid) {
         .map((d) => `<button class="${detail.includes(d) ? "on" : ""}" data-act="pdetail" data-v="${pid}:${d}" ${dis}>${d}</button>`)
         .join("")}</div>`
     : "";
-  const chosen = detail.length ? `<div class="pchosen">선호: ${detail.map((d) => `<span class="pb ${roleOfLabel(d)}">${d}</span>`).join(" ")}</div>` : "";
+  const shown = prefList(p);
+  const chosen = shown.length ? `<div class="pchosen">선호: ${shown.map(([t, r]) => `<span class="pb ${r}">${t}</span>`).join(" ")}</div>` : "";
   // 별을 누를 때마다: 빈 별 → 반 별 → 꽉 찬 별 → 다시 빈 별.  − / + 는 0.5씩
   const sk = p.skill ?? 3;
   const stars =
