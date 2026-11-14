@@ -15,6 +15,14 @@ import { render, commitLineup } from "./render.js";
 import { bindDrag, clickSuppressed, dropSlot, pitchPoint } from "./drag.js";
 import { $, copyText, toast } from "./utils.js";
 
+/** 평점 저장 (0 ~ 5, 0.5 단위) */
+async function setSkill(pid, v) {
+  const skill = Math.max(0, Math.min(5, Math.round(v * 2) / 2));
+  await api.putPlayer({ ...P(pid), skill });
+  M.openPlayer(pid);
+  render();
+}
+
 /** 보기 전용일 때 왜 안 되는지 */
 function viewOnlyReason() {
   if (S.mode === "remote" && !S.user) return "보기 전용이에요. ⚙️ 설정에서 구글로 로그인하세요";
@@ -22,13 +30,13 @@ function viewOnlyReason() {
 }
 
 /* 관리자만 할 수 있는 동작 (서버 규칙으로도 막혀 있어요) */
-const ADMIN_ONLY = new Set(["delmatch", "pdel", "bulkstart", "bulkdelete", "pskill", "import", "upload"]);
+const ADMIN_ONLY = new Set(["delmatch", "pdel", "bulkstart", "bulkdelete", "pstar", "pstep", "import", "upload"]);
 
 /* 보기 전용일 때 막을 동작 */
 const EDIT_ONLY = new Set([
   "tobench", "toteam", "topool", "attend", "unattend", "split", "fill", "clearteam", "resetall", "addteam", "delteam",
   "autoplace", "startmatch", "newmatch", "goal", "delgoal", "mstatus", "delmatch", "mrmplayer", "maddplayer",
-  "posopen", "posset", "posreset", "bulkstart", "bulkdelete", "lsave", "ppos", "pdetail", "pskill", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply", "pregular", "attendregulars", "rostertoggle",
+  "posopen", "posset", "posreset", "bulkstart", "bulkdelete", "lsave", "ppos", "pdetail", "pstar", "pstep", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply", "pregular", "attendregulars", "rostertoggle",
 ]);
 
 const actions = {
@@ -369,11 +377,21 @@ const actions = {
     commitLineup();
     toast(`고정 참여 ${ids.length}명 추가했어요`);
   },
-  async pskill(v) {
-    const [pid, n] = v.split(":");
-    await api.putPlayer({ ...P(pid), skill: +n });
-    M.openPlayer(pid);
-    render();
+  /* 평점: 별을 누를 때마다 빈 별 → 반 별 → 꽉 찬 별 → 빈 별 */
+  async pstar(v) {
+    const [pid, n] = v.split(":").map((x, i) => (i ? +x : x));
+    const cur = P(pid).skill ?? 3;
+    let next;
+    if (cur < n - 0.5) next = n - 0.5; // 빈 별 → 반 별
+    else if (cur === n - 0.5) next = n; // 반 별 → 꽉 찬 별
+    else if (cur === n) next = n - 1; // 꽉 찬 별 → 빈 별
+    else next = n; // 뒤쪽 별까지 차 있으면 이 별까지로 줄이기
+    await setSkill(pid, next);
+  },
+  /* 평점 − / + : 0.5씩 */
+  async pstep(v) {
+    const [pid, d] = v.split(":");
+    await setSkill(pid, (P(pid).skill ?? 3) + +d);
   },
   async psave(v) {
     const n = $("#pnm").value.trim();

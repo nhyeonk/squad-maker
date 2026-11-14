@@ -234,11 +234,12 @@ body.pdragging [data-drop],body.pdragging #pitch{outline:2px dashed rgba(224,168
 [data-act]{cursor:pointer}
 .ro-dim{opacity:.55}
 /* 0.5 단위 별점 */
-.star{position:relative;display:inline-block;font-size:30px;line-height:1;color:#d8d3c8}
+.star{position:relative;display:inline-block;font-size:30px;line-height:1;color:#d8d3c8;padding:0 1px;background:none}
+.stepbtn{width:32px;height:32px;border-radius:9px;background:var(--soft);font-size:20px;font-weight:800;line-height:1;margin:0 6px}
+.stepbtn:first-child{margin-left:0}
+.stepbtn:disabled{opacity:.35}
 .star.full{color:#f0b400}
 .star.half{background:linear-gradient(90deg,#f0b400 50%,#d8d3c8 50%);-webkit-background-clip:text;background-clip:text;color:transparent}
-.star .sh{position:absolute;top:0;bottom:0;width:50%;padding:0;background:transparent}
-.star .sh.l{left:0}.star .sh.r{right:0}
 .skn{margin-left:10px;font-size:16px;color:var(--sub)}
 /* 🧺 빨래 당번 뽑기 */
 .lex{margin:0 0 10px;font-size:13px}
