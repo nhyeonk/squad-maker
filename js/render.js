@@ -1,5 +1,6 @@
 // 화면 그리기 (탭 전환, 상단 상태 표시)
 import { S } from "./state.js";
+import { api } from "./store.js";
 import { $ } from "./utils.js";
 import { viewLineup, viewSelbar } from "./views/lineup.js";
 import { viewMatchList, viewMatch } from "./views/matches.js";
@@ -17,8 +18,10 @@ function renderChrome() {
   document.querySelector('[data-act="settings"]')?.classList.toggle("has-dot", S.isOwner && (S.requests || []).length > 0);
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.v === S.ui.tab));
 
-  $("#banner").innerHTML =
-    S.mode === "remote" && !S.canEdit
+  const reqs = S.isOwner ? (S.requests || []).length : 0;
+  $("#banner").innerHTML = reqs
+    ? `<div class="banner reqbanner"><span class="sp">✋ 기록자 신청이 <b>${reqs}건</b> 있어요.</span><button class="btn sm pri" data-act="settings">확인하기</button></div>`
+    : S.mode === "remote" && !S.canEdit
       ? `<div class="banner"><span class="sp">보기 전용이에요. 기록을 입력하려면 ⚙️ 설정에서 로그인하세요.</span><button class="btn sm ghost" data-act="settings">로그인</button></div>`
       : "";
 
@@ -65,3 +68,10 @@ document.addEventListener("focusout", () =>
     }
   }, 50)
 );
+
+/** 라인업 변경 저장 + 선택 해제 + 다시 그리기 */
+export function commitLineup() {
+  S.ui.sel = null;
+  api.putLineup();
+  render();
+}

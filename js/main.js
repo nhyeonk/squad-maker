@@ -4,6 +4,7 @@ import { getCfg, initFirebase, readJoinHash, useLocal } from "./store.js";
 import { render, scheduleRender } from "./render.js";
 import { bindEvents } from "./events.js";
 import { toast } from "./utils.js";
+import { APP_VERSION } from "./config.js";
 
 hooks.render = render;
 hooks.scheduleRender = scheduleRender;
@@ -29,7 +30,7 @@ if (cfg) {
 // 홈 화면에 설치 (PWA)
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
   const hadController = !!navigator.serviceWorker.controller;
-  navigator.serviceWorker.register("sw.js").then((reg) => reg.update()).catch(() => {});
+  navigator.serviceWorker.register(`sw.js?v=${APP_VERSION}`).then((reg) => reg.update()).catch(() => {});
   // 새 버전이 설치되면 한 번 자동 새로고침
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (hadController && !sessionStorage.getItem("sw-reloaded")) {

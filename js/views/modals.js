@@ -25,7 +25,7 @@ export function openPlayer(pid) {
   if (!p) return;
   const s = computeStats().st[pid] || {};
   const ed = S.canEdit;
-  const dis = ed ? "" : "disabled";
+  const dis = ""; // 보기 전용이어도 누를 수는 있게 두고, 누르면 이유를 알려줘요
 
   const hist = Object.values(S.matches)
     .filter((m) => m.teams.some((T) => (T.players || []).includes(pid)))
@@ -55,14 +55,22 @@ export function openPlayer(pid) {
         .join("")}</div>`
     : "";
   const chosen = detail.length ? `<div class="pchosen">선호: ${detail.map((d) => `<span class="pb ${roleOfLabel(d)}">${d}</span>`).join(" ")}</div>` : "";
-  const stars = [1, 2, 3, 4, 5].map((n) => `<button class="${n <= (p.skill || 3) ? "on" : ""}" data-act="pskill" data-v="${pid}:${n}" ${dis}>★</button>`).join("");
+  // 별 하나를 반으로 나눠서 왼쪽을 누르면 0.5, 오른쪽을 누르면 1
+  const sk = p.skill ?? 3;
+  const stars = [1, 2, 3, 4, 5]
+    .map((n) => {
+      const fill = sk >= n ? "full" : sk >= n - 0.5 ? "half" : "";
+      return `<span class="star ${fill}">★<button class="sh l" data-act="pskill" data-v="${pid}:${n - 0.5}" aria-label="${n - 0.5}점"></button><button class="sh r" data-act="pskill" data-v="${pid}:${n}" aria-label="${n}점"></button></span>`;
+    })
+    .join("") + `<b class="skn">${sk.toFixed(1)}</b>`;
 
   openModal(`<h2>${ed ? `<input class="in" id="pnm" value="${esc(p.name)}" style="font-weight:800;font-size:17px">` : esc(p.name)}${closeBtn}</h2>
-    <div class="sec"><button class="btn block ${p.regular ? "pri" : "ghost"}" data-act="pregular" data-v="${pid}" ${dis}>${p.regular ? "⭐ 고정 참여 (눌러서 해제)" : "☆ 고정 참여로 지정"}</button></div>
-    <div class="sec"><label>선호 포지션 · 누른 순서가 우선순위예요 (다시 누르면 해제)</label><div class="posbtns">${posBtns}</div>${detailRow}${chosen}</div>
-    <div class="sec"><label>실력 (팀 밸런스용)</label><div class="stars">${stars}</div></div>
+    ${ed ? "" : `<div class="banner" style="margin-bottom:12px">👀 보기 전용이라 바꿀 수 없어요. ⚙️ 설정에서 기록자로 로그인하면 바꿀 수 있어요.</div>`}
+    <div class="sec ${ed ? "" : "ro-dim"}"><button class="btn block ${p.regular ? "pri" : "ghost"}" data-act="pregular" data-v="${pid}" ${dis}>${p.regular ? "⭐ 고정 참여 (눌러서 해제)" : "☆ 고정 참여로 지정"}</button></div>
+    <div class="sec ${ed ? "" : "ro-dim"}"><label>선호 포지션 · 누른 순서가 우선순위예요 (다시 누르면 해제)</label><div class="posbtns">${posBtns}</div>${detailRow}${chosen}</div>
+    <div class="sec ${ed ? "" : "ro-dim"}"><label>실력 (팀 밸런스용 · 별 왼쪽 절반을 누르면 0.5점)</label><div class="stars">${stars}</div></div>
     <div class="sec"><label>기록</label>
-      <div style="font-size:14px;font-weight:700">${s.apps || 0}경기 · ${s.goals || 0}골 · ${s.ast || 0}도움 · ${s.w || 0}승 ${s.d || 0}무 ${s.l || 0}패</div>${hist}</div>
+      <div style="font-size:14px;font-weight:700">${s.apps || 0}경기 · ${s.goals || 0}골 · ${s.ast || 0}도움 · ${s.w || 0}승 ${s.d || 0}무 ${s.l || 0}패${s.laundry ? ` · 🧺 빨래 ${s.laundry}회` : ""}</div>${hist}</div>
     ${ed ? `<div class="row"><button class="btn pri" data-act="psave" data-v="${pid}" style="flex:1">이름 저장</button><button class="btn danger" data-act="pdel" data-v="${pid}">선수 삭제</button></div>` : ""}`);
 }
 
@@ -234,7 +242,7 @@ export function maskEmail(e = "") {
 function recordersSection() {
   const list = S.recorders?.emails || [];
   const reqs = S.requests || [];
-  const open = S.ui.recordersOpen || reqs.length ? "open" : "";
+  const open = S.ui.recordersOpen || reqs.length || S.requestsError ? "open" : "";
   const reqHtml = reqs.length
     ? `<div class="reqlist"><div class="reqtitle">✋ 기록자 신청 ${reqs.length}건</div>${reqs
         .map((r) => `<div class="reqrow"><div style="min-width:0"><b>${esc(r.name || "(이름 없음)")}</b><small>${esc(r.email)}</small></div>
@@ -244,6 +252,7 @@ function recordersSection() {
   return `<div class="sec"><details class="recbox" ${open} data-act-toggle="recordersOpen">
     <summary><span>✏️ 기록자 <b>${list.length + 1}명</b> · 관리${reqs.length ? ` <span class="reqdot">신청 ${reqs.length}</span>` : ""}</span><span class="chev">›</span></summary>
     ${reqHtml}
+    ${S.requestsError ? `<div class="banner" style="margin:0 0 10px">⚠️ 기록자 신청 목록을 불러오지 못했어요 (${esc(S.requestsError)}).<br>Firebase 콘솔 → Firestore → 규칙에 최신 <code>firestore.rules</code>를 붙여넣고 게시해 주세요.</div>` : ""}
     <div class="reclist">
       <div class="recrow"><span>👑 ${esc(maskEmail(S.recorders.owner))}</span><span class="rectag">관리자</span></div>
       ${list.map((e) => `<div class="recrow"><span title="${esc(e)}">${esc(maskEmail(e))}</span><button class="recdel" data-act="recdel" data-v="${esc(e)}" aria-label="삭제">×</button></div>`).join("")}

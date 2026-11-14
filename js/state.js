@@ -55,5 +55,9 @@ export function lineup() {
 export const P = (id) => S.players[id];
 export const pname = (id) => P(id)?.name || "(삭제됨)";
 
+/** 선수·경기 데이터가 바뀔 때마다 올라가는 번호 (통계 계산 결과를 재사용할지 판단) */
+export const dataVersion = { n: 0 };
+export const bumpData = () => dataVersion.n++;
+
 /** 화면 다시 그리기 훅 (main.js에서 연결) */
 export const hooks = { render: () => {}, scheduleRender: () => {} };

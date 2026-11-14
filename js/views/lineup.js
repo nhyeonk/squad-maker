@@ -111,7 +111,7 @@ function poolCard(l) {
       <button class="btn" data-act="clearteam">이 팀 비우기</button>
       <button class="btn" data-act="resetall">전체 초기화</button>
     </div>
-    <p class="hint" data-edit>선수를 <b>끌어서</b> 경기장·후보·팀 명단으로 옮길 수 있어요. 폰에서는 살짝 길게 눌렀다가 끌어요. 밸런스 나누기는 실력(★)과 선호 포지션을 보고 나눠요.</p>
+    <p class="hint" data-edit>선수를 <b>끌어서</b> 경기장·후보·팀 명단으로 옮길 수 있어요. 폰에서는 살짝 길게 눌렀다가 끌어요. 밸런스 나누기는 <b>별 합계가 최대한 같아지게</b> 나누고 포지션도 고르게 섞어요.</p>
   </div>`;
 }
 
@@ -122,7 +122,8 @@ function teamsCard(l, t, slots) {
     .map((x, i) => {
       const ids = teamPlayers(x).filter(P);
       const canDrop = sel && selLoc && !(selLoc.kind !== "pool" && selLoc.team === i);
-      const avg = ids.length ? (ids.reduce((a, id) => a + (P(id).skill || 3), 0) / ids.length).toFixed(1) : "-";
+      const sum = ids.reduce((a, id) => a + (P(id).skill ?? 3), 0);
+      const avg = ids.length ? `★${sum.toFixed(1)} (평균 ${(sum / ids.length).toFixed(1)})` : "★-";
       const action = canDrop
         ? `<button class="btn sm pri" data-act="toteam" data-v="${i}">여기로 이동</button>`
         : i === t
@@ -139,7 +140,7 @@ function teamsCard(l, t, slots) {
         : `<span class="hint" style="margin:0">아직 배치된 선수가 없어요.</span>`;
       return `<div class="tcard ${i === t ? "on" : ""} ${canDrop ? "drop" : ""}" data-drop="team:${i}">
         <div class="th">${dot(x.color)}${esc(x.name)} <span class="badge">${ids.length}명</span>
-          <span style="font-size:11.5px;color:var(--sub);font-weight:600">평균 ★${avg}</span><span class="sp"></span>${action}</div>
+          <span style="font-size:11.5px;color:var(--sub);font-weight:600">${avg}</span><span class="sp"></span>${action}</div>
         <div class="chips">${chips}</div></div>`;
     })
     .join("");
@@ -182,6 +183,7 @@ export function viewLineup() {
     <p class="hint" data-edit>선수를 <b>끌어서</b> 원하는 곳에 놓으면 자리가 옮겨지고, 다른 선수 위에 놓으면 서로 바뀌어요. 경기장 밖 <b>대기 명단·후보·팀 명단</b>으로 끌어내도 돼요. 눌러서 선택한 뒤 빈 잔디를 눌러도 돼요. 포지션 이름은 위치에 맞게 바뀌고, 아래 바의 <b>포지션</b>으로 직접 고를 수도 있어요.</p>
     <div style="display:grid;gap:8px;margin-top:12px">
       <div class="grid2"><button class="btn" data-act="img">🖼️ 스쿼드 이미지 저장</button><button class="btn" data-act="copytext">📋 명단 텍스트 복사</button></div>
+      <button class="btn block" data-act="laundry">🧺 빨래 당번 뽑기 (룰렛 · 사다리)</button>
       <button class="btn pri block" data-act="startmatch" data-edit>⚽ 이 라인업으로 경기 기록 시작</button>
     </div>
   </section>

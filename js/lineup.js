@@ -129,52 +129,87 @@ export function relayoutAll() {
 }
 
 /**
- * 실력(★)과 선호 포지션을 고려해 참가자 전원을 팀 수만큼 나눠요.
- * 1) 골키퍼가 주 포지션인 사람은 팀마다 한 명씩
- * 2) 나머지는 실력 높은 순으로, 인원이 적은 팀 → 같은 포지션이 적은 팀 → 실력 합이 낮은 팀에 배정
- * 매번 약간의 무작위를 섞어 누를 때마다 조합이 달라져요.
+ * 실력(★, 0.5 단위)과 포지션을 보고 참가자 전원을 팀 수만큼 공정하게 나눠요.
+ *
+ * 1) 여러 번 무작위로 나눠 본 뒤, 두 팀 사이에서 선수를 맞바꿔 점수가 좋아지는 동안 계속 바꿔요 (언덕 오르기)
+ * 2) 점수(낮을수록 공정) = 팀별 별 합계 차이 + 포지션 쏠림(공격/미드/수비/골키퍼) + 골키퍼 몰림
+ * 3) 가장 공정한 조합들 중에서 하나를 무작위로 골라, 누를 때마다 조합이 달라져요
+ * 인원이 다른 팀(예: 11 vs 10)은 인원 비율만큼 합계를 맞춰요.
  */
 export function balanceSplit() {
   const l = lineup();
-  const n = l.teams.length;
-  const all = l.attendees.filter((id) => P(id));
-  if (!all.length) return false;
+  const k = l.teams.length;
+  const ids = l.attendees.filter((id) => P(id));
+  if (!ids.length) return false;
 
-  const skill = (id) => P(id).skill || 3;
-  const jitter = (id) => skill(id) + Math.random() * 0.8;
-  const primary = (id) => (P(id).pos || [])[0] || "X";
-  const buckets = Array.from({ length: n }, () => ({ ids: [], sum: 0, roles: {} }));
-  const add = (b, id) => {
-    b.ids.push(id);
-    b.sum += skill(id);
-    b.roles[primary(id)] = (b.roles[primary(id)] || 0) + 1;
+  const sk = ids.map((id) => P(id).skill ?? 3);
+  const role = ids.map((id) => (P(id).pos || [])[0] || "X");
+  const n = ids.length;
+  const total = sk.reduce((a, b) => a + b, 0);
+  const sizes = Array.from({ length: k }, (_, t) => Math.floor(n / k) + (t < n % k ? 1 : 0));
+  const gkCount = role.filter((r) => r === "GK").length;
+
+  // 배정 → 점수
+  const cost = (asg) => {
+    const sum = Array(k).fill(0), cnt = Array(k).fill(0), roles = Array.from({ length: k }, () => ({}));
+    asg.forEach((t, i) => {
+      sum[t] += sk[i];
+      cnt[t]++;
+      roles[t][role[i]] = (roles[t][role[i]] || 0) + 1;
+    });
+    let c = 0;
+    for (let t = 0; t < k; t++) c += Math.abs(sum[t] - (total * cnt[t]) / n) * 10; // 별 합계 차이 (가장 중요)
+    for (const r of ["FW", "MF", "DF"]) {
+      const v = roles.map((x) => x[r] || 0);
+      c += Math.max(0, Math.max(...v) - Math.min(...v) - 1) * 3; // 같은 포지션이 한 팀에 몰리면 감점
+    }
+    const g = roles.map((x) => x.GK || 0);
+    if (gkCount >= k) c += g.filter((x) => x === 0).length * 8; // 골키퍼가 충분하면 팀마다 한 명씩
+    else c += g.filter((x) => x > 1).length * 8; // 부족하면 한 팀에 두 명은 피하기
+    return c;
   };
 
-  const used = new Set();
-  shuffle(all.filter((id) => primary(id) === "GK"))
-    .sort((a, b) => jitter(b) - jitter(a))
-    .slice(0, n)
-    .forEach((id, i) => {
-      add(buckets[i], id);
-      used.add(id);
+  const randomStart = () => {
+    const order = shuffle([...Array(n).keys()]);
+    const asg = Array(n);
+    let p = 0;
+    sizes.forEach((size, t) => {
+      for (let j = 0; j < size; j++) asg[order[p++]] = t;
     });
+    return asg;
+  };
 
-  all
-    .filter((id) => !used.has(id))
-    .map((id) => ({ id, s: jitter(id) }))
-    .sort((a, b) => b.s - a.s)
-    .forEach(({ id }) => {
-      const minCount = Math.min(...buckets.map((b) => b.ids.length));
-      const role = primary(id);
-      const best = buckets
-        .filter((b) => b.ids.length === minCount)
-        .sort((a, b) => (a.roles[role] || 0) - (b.roles[role] || 0) || a.sum - b.sum)[0];
-      add(best, id);
-    });
+  // 선수 둘을 맞바꿔서 좋아지면 계속
+  const improve = (asg) => {
+    let best = cost(asg);
+    for (let loop = 0; loop < 50; loop++) {
+      let gain = 0, bi = -1, bj = -1;
+      for (let i = 0; i < n; i++)
+        for (let j = i + 1; j < n; j++) {
+          if (asg[i] === asg[j]) continue;
+          [asg[i], asg[j]] = [asg[j], asg[i]];
+          const c = cost(asg);
+          [asg[i], asg[j]] = [asg[j], asg[i]];
+          if (best - c > gain + 1e-9) [gain, bi, bj] = [best - c, i, j];
+        }
+      if (bi < 0) break;
+      [asg[bi], asg[bj]] = [asg[bj], asg[bi]];
+      best -= gain;
+    }
+    return { asg, c: best };
+  };
 
-  buckets.forEach((b, i) => autoPlace(i, shuffle(b.ids)));
+  const tries = Array.from({ length: 40 }, () => improve(randomStart()));
+  const bestC = Math.min(...tries.map((x) => x.c));
+  const good = tries.filter((x) => x.c <= bestC + 0.6); // 거의 같은 공정함이면 아무거나
+  const pick = good[Math.floor(Math.random() * good.length)].asg;
+
+  for (let t = 0; t < k; t++) autoPlace(t, shuffle(ids.filter((_, i) => pick[i] === t)));
   return true;
 }
+
+/** 팀별 별 합계 (화면 표시용) */
+export const teamSkillSum = (T) => teamPlayers(T).filter(P).reduce((a, id) => a + (P(id).skill ?? 3), 0);
 
 /** 대기 명단 선수로 지금 보는 팀의 빈자리 채우기 */
 export function fillEmpty(teamIdx) {

@@ -7,6 +7,17 @@ const TESSERACT_URL = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesserac
 const IGNORE = new Set(["투표자", "이름순", "항목", "투표", "참여", "참여자", "미참여", "나", "친구", "초대", "완료", "명", "닫기", "결과", "보기"]);
 
 let workerPromise = null;
+let idleTimer = null;
+
+/** 다 쓰고 1분 동안 안 쓰면 인식 엔진을 꺼서 폰 메모리를 돌려줘요 (다음에 쓰면 다시 켜요) */
+function scheduleIdleStop() {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(async () => {
+    const p = workerPromise;
+    workerPromise = null;
+    try { (await p)?.terminate(); } catch {}
+  }, 60_000);
+}
 
 function loadScript(src) {
   return new Promise((ok, fail) => {
@@ -92,6 +103,7 @@ export function extractNames(text) {
  * 이미 있는 선수와 비슷하면 그 선수 이름으로 바로잡아요 (예: 방하능 → 박하늘)
  */
 export async function recognizeNames(files, onProgress) {
+  clearTimeout(idleTimer);
   const worker = await getWorker(onProgress);
   const raws = [];
   for (const f of files) {
@@ -99,6 +111,7 @@ export async function recognizeNames(files, onProgress) {
     const { data } = await worker.recognize(canvas);
     extractNames(data.text).forEach((n) => !raws.includes(n) && raws.push(n));
   }
+  scheduleIdleStop();
   const seen = new Set();
   return raws
     .map((raw) => {

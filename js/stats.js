@@ -1,5 +1,5 @@
 // 경기 기록 → 선수별 통계
-import { S, P } from "./state.js";
+import { S, P, dataVersion } from "./state.js";
 
 export const scoreOf = (m) => {
   const s = [0, 0];
@@ -16,10 +16,22 @@ function inPeriod(m, period) {
   return true;
 }
 
+/** 같은 데이터로 여러 번 부르면 저장해 둔 결과를 돌려줘요 (화면을 그릴 때마다 다시 계산하지 않게) */
+const memo = new Map();
+function cached(key, fn) {
+  const k = dataVersion.n + "|" + key;
+  if (!memo.has(k)) {
+    if (memo.size > 20) memo.clear();
+    memo.set(k, fn());
+  }
+  return memo.get(k);
+}
+
 /** 승/무/패는 '종료'된 경기만 계산해요 */
-export function computeStats(period = "all") {
+export const computeStats = (period = "all") => cached("stats:" + period, () => calcStats(period));
+function calcStats(period) {
   const st = {};
-  const g = (id) => (st[id] ||= { id, apps: 0, w: 0, d: 0, l: 0, goals: 0, ast: 0, og: 0, roles: {} });
+  const g = (id) => (st[id] ||= { id, apps: 0, w: 0, d: 0, l: 0, goals: 0, ast: 0, og: 0, laundry: 0, roles: {} });
   Object.values(S.players).forEach((p) => g(p.id));
 
   const ms = Object.values(S.matches).filter((m) => inPeriod(m, period));
@@ -39,6 +51,7 @@ export function computeStats(period = "all") {
         }
       })
     );
+    (m.laundry || []).forEach((id) => g(id).laundry++);
     (m.goals || []).forEach((x) => {
       if (x.og) {
         if (x.scorer) g(x.scorer).og++;
@@ -58,7 +71,8 @@ export function recommendedPos(pid, s) {
 }
 
 /** 선수별 참가 횟수 (경기한 날짜 수) */
-export function attendanceCounts() {
+export const attendanceCounts = () => cached("attend", calcAttendance);
+function calcAttendance() {
   const days = {};
   Object.values(S.matches).forEach((m) =>
     m.teams.forEach((T) => (T.players || []).forEach((pid) => (days[pid] ||= new Set()).add(m.date)))

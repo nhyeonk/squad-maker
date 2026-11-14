@@ -31,7 +31,8 @@ export function viewMatchList() {
         <div class="ms"><span style="display:flex;align-items:center;gap:6px">${dot(m.teams[0].color)}${esc(m.teams[0].name)}</span>
           <span class="n">${sc[0]} : ${sc[1]}</span>
           <span style="display:flex;align-items:center;gap:6px;justify-content:flex-end">${esc(m.teams[1].name)}${dot(m.teams[1].color)}</span></div>
-        <div class="scr"><span>${scorersText(m, 0)}</span><span style="text-align:right">${scorersText(m, 1)}</span></div></button>`;
+        <div class="scr"><span>${scorersText(m, 0)}</span><span style="text-align:right">${scorersText(m, 1)}</span></div>
+        ${(m.laundry || []).length ? `<div class="mt" style="margin-top:6px">🧺 ${m.laundry.map((id) => esc(pname(id))).join(", ")}</div>` : ""}</button>`;
     })
     .join("");
   return `<div class="row" style="margin-bottom:12px"><h3 style="margin:0;flex:1;display:flex;gap:7px;align-items:center">경기 기록 <span class="badge">${ms.length}경기</span></h3>
@@ -83,6 +84,9 @@ export function viewMatch(m) {
       ${goals.length ? `<div class="glist">${goalRows}</div>` : `<div class="empty">아직 골이 없어요.</div>`}</div>
     <div class="card"><h3>출전 선수</h3><div class="grid2" style="gap:14px">${roster(m.teams[0], 0)}${roster(m.teams[1], 1)}</div>
       <p class="hint" data-edit>교체로 뛴 사람은 "+ 추가"로 넣어야 출전 기록에 잡혀요.</p></div>
+    <div class="card lcard"><div class="row"><div style="flex:1"><b>🧺 빨래 당번</b>
+        <div class="hint" style="margin-top:4px">${(m.laundry || []).length ? m.laundry.map((id) => `<b style="color:var(--ink)">${esc(pname(id))}</b>`).join(", ") : "진 팀에서 룰렛이나 사다리로 뽑아요."}</div></div>
+      <button class="btn" data-act="laundry" data-v="${m.id}">${(m.laundry || []).length ? "다시 뽑기" : "뽑기"}</button></div></div>
     <div class="row" data-edit>
       ${m.status === "done"
         ? `<button class="btn" data-act="mstatus" data-v="live">다시 진행 중으로</button>`

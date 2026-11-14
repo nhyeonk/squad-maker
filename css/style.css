@@ -18,7 +18,7 @@ header{display:flex;align-items:center;gap:10px;padding:6px 2px 12px}
 .sync{font-size:11.5px;font-weight:700;padding:5px 9px;border-radius:99px;background:var(--soft);color:var(--sub);white-space:nowrap}
 .sync.live{background:#dff3e6;color:var(--green)}
 .sync.ro{background:#fff1d6;color:#8a5a00}
-.iconbtn{width:38px;height:38px;border-radius:11px;background:var(--card);border:1px solid var(--line);display:grid;place-items:center;flex:none}
+.iconbtn{position:relative;width:38px;height:38px;border-radius:11px;background:var(--card);border:1px solid var(--line);display:grid;place-items:center;flex:none}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 14px;border-radius:11px;background:var(--soft);font-weight:700;font-size:14px;white-space:nowrap}
 .btn.pri{background:var(--green);color:#fff}
 .btn.dark{background:#1d1d1b;color:#fff}
@@ -58,14 +58,29 @@ label.lb{font-size:12.5px;color:var(--sub);font-weight:600}
 .pitch.futsal{background:repeating-linear-gradient(180deg,#3d79b8 0 12.5%,#3770ad 12.5% 25%)}
 .pitch .ln{position:absolute;border:2px solid rgba(255,255,255,.7)}
 .pitch .tag{position:absolute;left:8px;top:8px;background:rgba(0,0,0,.35);color:#fff;font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:99px;z-index:2}
-.slot{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:3px;width:74px;z-index:3}
-.slot .cir{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;
-  background:rgba(0,0,0,.18);border:2px dashed currentColor;transition:transform .12s}
-.slot.filled .cir{background:#fff;border-style:solid;color:#1d1d1b}
-.slot .nm{font-size:12px;font-weight:800;color:#fff;background:rgba(0,0,0,.45);padding:2px 6px;border-radius:6px;max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.slot .rl{font-size:9.5px;font-weight:800}
-.slot.sel .cir{transform:scale(1.15);box-shadow:0 0 0 4px #ffe066}
+/* 경기장 위 선수 (포지션 색 동그라미 + 숫자 배지 + 팀 색 이름표) */
+.slot{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:4px;width:80px;z-index:3;
+  touch-action:none;user-select:none;-webkit-user-select:none}
+.pitch .slot{cursor:grab}
+.slot .cir{position:relative;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-size:10.5px;font-weight:800;letter-spacing:-.2px;
+  background:rgba(0,0,0,.16);border:2px dashed currentColor;transition:transform .12s}
+.slot.filled .cir{border:2.5px solid #fff;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.28)}
+.slot.filled .cir.role-FW{background:var(--fw)}
+.slot.filled .cir.role-MF{background:var(--mf)}
+.slot.filled .cir.role-DF{background:var(--df)}
+.slot.filled .cir.role-GK{background:var(--gk);color:#3a2c00}
+.slot .rl{font-size:10.5px;font-weight:900;color:inherit}
+.slot .nb{position:absolute;top:-7px;right:-8px;min-width:19px;height:19px;padding:0 4px;border-radius:99px;background:#fff;color:#1d1d1b;
+  font-size:11px;font-weight:900;display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.slot .nm{background:#1f2a24;color:#fff;font-size:12px;font-weight:800;padding:2px 7px 1px;border-radius:5px;border-bottom:3px solid var(--tc,#e5484d);
+  max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slot.sel .cir{transform:scale(1.12);box-shadow:0 0 0 4px #ffe066,0 2px 6px rgba(0,0,0,.3)}
 .slot.target .cir{box-shadow:0 0 0 3px rgba(255,255,255,.55)}
+.slot.dragging{z-index:10;cursor:grabbing;transition:none}
+.slot.dragging .cir{transform:scale(1.2);box-shadow:0 6px 16px rgba(0,0,0,.35)}
+.slot.faded{opacity:.35}
+.pitch .spot{position:absolute;left:50%;top:50%;width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.8);transform:translate(-50%,-50%)}
+.pitch.picking{cursor:crosshair}
 .role-FW{color:var(--fw)}.role-MF{color:var(--mf)}.role-DF{color:var(--df)}.role-GK{color:var(--gk)}
 .side{width:96px;display:flex;flex-direction:column;gap:8px;flex:none}
 .sidebox{background:#20302a;color:#fff;border-radius:12px;padding:9px;font-size:12.5px}
@@ -74,7 +89,7 @@ label.lb{font-size:12.5px;color:var(--sub);font-weight:600}
 .sidebox .bchip{display:block;width:100%;text-align:left;background:rgba(255,255,255,.12);color:#fff;border-radius:8px;padding:6px 7px;margin-bottom:5px;font-weight:700;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sidebox .bchip.sel{background:#ffe066;color:#1d1d1b}
 .sidebox .drop{display:block;width:100%;border:1px dashed rgba(255,255,255,.35);border-radius:8px;padding:8px 4px;color:rgba(255,255,255,.75);font-size:12px;font-weight:700}
-@media (max-width:520px){.side{width:82px}.slot{width:62px}.slot .cir{width:38px;height:38px;font-size:10px}.slot .nm{font-size:11px;max-width:64px}}
+@media (max-width:520px){.side{width:82px}.slot{width:66px}.slot .cir{width:36px;height:36px}.slot .rl{font-size:9.5px}.slot .nm{font-size:11px;max-width:66px}}
 .legend{display:flex;gap:12px;justify-content:center;font-size:11.5px;color:var(--sub);font-weight:700;margin:8px 0}
 .legend span{display:flex;align-items:center;gap:4px}
 .legend i{width:9px;height:9px;border-radius:50%;border:2px solid}
@@ -96,9 +111,8 @@ label.lb{font-size:12.5px;color:var(--sub);font-weight:600}
 .tcard .chip{padding:5px 8px;font-size:13px}
 .selbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));z-index:60;background:#1d1d1b;color:#fff;border-radius:14px;padding:10px 10px 10px 14px;display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:calc(100% - 20px);font-size:13.5px}
 .selbar>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.selbar .btn{flex:none}
+.selbar .btn{flex:none;background:rgba(255,255,255,.14);color:#fff}
 .selbar b{color:#ffe066}
-.selbar .btn{background:rgba(255,255,255,.14);color:#fff}
 /* match */
 .score{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;text-align:center;gap:8px;padding:6px 0}
 .score .tn{font-weight:800;display:flex;align-items:center;justify-content:center;gap:6px}
@@ -147,9 +161,7 @@ table.tb{width:100%;border-collapse:collapse;background:#fff;font-size:14px}
 .posbtns button.on.FW{background:var(--fw);color:#fff}.posbtns button.on.MF{background:var(--mf);color:#fff}
 .posbtns button.on.DF{background:var(--df);color:#fff}.posbtns button.on.GK{background:var(--gk);color:#3a2c00}
 .posbtns button i{position:absolute;top:3px;right:6px;font-style:normal;font-size:11px}
-.stars{display:flex;gap:4px}
-.stars button{font-size:26px;color:#d8d3c8;line-height:1}
-.stars button.on{color:#f0b400}
+.stars{display:flex;gap:4px;align-items:center}
 .pick{display:flex;flex-wrap:wrap;gap:6px}
 .pick button{padding:9px 12px;border-radius:10px;background:var(--soft);font-weight:700}
 .pick button.on{background:var(--green);color:#fff}
@@ -183,7 +195,6 @@ details.others summary{font-size:12.5px;color:var(--sub);font-weight:700;cursor:
 .recdel{width:28px;height:28px;border-radius:8px;color:var(--mute);font-size:18px}
 .recdel:hover{background:#ffecec;color:#d13438}
 /* 기록자 신청 */
-.iconbtn{position:relative}
 .iconbtn.has-dot::after{content:"";position:absolute;top:6px;right:6px;width:9px;height:9px;border-radius:50%;background:#e5484d;box-shadow:0 0 0 2px #fff}
 .reqdot{font-size:11.5px;font-weight:800;background:#e5484d;color:#fff;padding:2px 7px;border-radius:99px;margin-left:4px}
 .reqlist{background:#fff6f6;border:1px solid #f6d3d3;border-radius:10px;padding:8px 10px;margin-bottom:10px}
@@ -196,30 +207,11 @@ details.others summary{font-size:12.5px;color:var(--sub);font-weight:700;cursor:
 .reqbox{background:#f3f8f4;border:1px solid #cfe5d6;border-radius:10px;padding:10px 12px;display:grid;gap:4px;font-size:13.5px}
 .reqbox span{color:var(--sub);font-size:12.5px}
 .reqbox .btn{justify-self:start;margin-top:4px}
-/* 끌어서 옮기기 & 포지션 고르기 */
-.slot{touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
-.slot.dragging{z-index:10;cursor:grabbing;transition:none}
-.slot.dragging .cir{transform:scale(1.2);box-shadow:0 6px 16px rgba(0,0,0,.35)}
-.pitch.picking{cursor:crosshair}
+/* 포지션 고르기 */
 .posgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px}
 .pg{padding:10px 4px;border-radius:9px;background:var(--soft);font-weight:800;font-size:13.5px}
 .pg.on.FW{background:var(--fw);color:#fff}.pg.on.MF{background:var(--mf);color:#fff}
 .pg.on.DF{background:var(--df);color:#fff}.pg.on.GK{background:var(--gk);color:#3a2c00}
-/* 선수 표시 (포지션 색 동그라미 + 숫자 배지 + 팀 색 이름표) */
-.slot{width:80px;gap:4px}
-.slot .cir{position:relative;width:40px;height:40px;border:2px dashed currentColor;background:rgba(0,0,0,.16);font-size:10.5px;letter-spacing:-.2px}
-.slot.filled .cir{border:2.5px solid #fff;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.28)}
-.slot.filled .cir.role-FW{background:var(--fw)}
-.slot.filled .cir.role-MF{background:var(--mf)}
-.slot.filled .cir.role-DF{background:var(--df)}
-.slot.filled .cir.role-GK{background:var(--gk);color:#3a2c00}
-.slot .rl{font-size:10.5px;font-weight:900;color:inherit}
-.slot .nb{position:absolute;top:-7px;right:-8px;min-width:19px;height:19px;padding:0 4px;border-radius:99px;background:#fff;color:#1d1d1b;
-  font-size:11px;font-weight:900;display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.3)}
-.slot .nm{background:#1f2a24;color:#fff;font-size:12px;padding:2px 7px 1px;border-radius:5px;border-bottom:3px solid var(--tc,#e5484d);max-width:80px}
-.slot.sel .cir{transform:scale(1.12);box-shadow:0 0 0 4px #ffe066,0 2px 6px rgba(0,0,0,.3)}
-.pitch .spot{position:absolute;left:50%;top:50%;width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.8);transform:translate(-50%,-50%)}
-@media (max-width:520px){.slot{width:66px}.slot .cir{width:36px;height:36px}.slot .rl{font-size:9.5px}.slot .nm{font-size:11px;max-width:66px}}
 /* 스쿼드 이미지 미리보기 */
 .modal.wide{max-width:760px}
 .imgprev{background:#e9e5dc;border:1px solid var(--line);border-radius:12px;padding:8px;max-height:62vh;overflow:auto;text-align:center}
@@ -250,4 +242,34 @@ body.pdragging [data-drop],body.pdragging #pitch{outline:2px dashed rgba(224,168
 .pdetail.MF button.on{background:var(--mf);border-color:var(--mf);color:#fff}
 .pdetail.DF button.on{background:var(--df);border-color:var(--df);color:#fff}
 .pchosen{margin-top:8px;font-size:12.5px;color:var(--sub);font-weight:600}
-.slot.faded{opacity:.35}
+/* 아이폰(사파리)은 버튼이 아닌 요소의 탭을 cursor:pointer가 있어야 전달해요 */
+[data-act]{cursor:pointer}
+.ro-dim{opacity:.55}
+.banner.reqbanner{background:#fff3f3;border-color:#f6d3d3;color:#9b2c2f}
+/* 0.5 단위 별점 */
+.star{position:relative;display:inline-block;font-size:30px;line-height:1;color:#d8d3c8}
+.star.full{color:#f0b400}
+.star.half{background:linear-gradient(90deg,#f0b400 50%,#d8d3c8 50%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.star .sh{position:absolute;top:0;bottom:0;width:50%;padding:0;background:transparent}
+.star .sh.l{left:0}.star .sh.r{right:0}
+.skn{margin-left:10px;font-size:16px;color:var(--sub)}
+/* 🧺 빨래 당번 뽑기 */
+.lex{margin:0 0 10px;font-size:13px}
+.lex summary{cursor:pointer;color:var(--sub);font-weight:700}
+.lstage{background:#faf9f6;border:1px solid var(--line);border-radius:14px;padding:12px}
+.wheelbox{position:relative;width:min(100%,340px);margin:0 auto 12px}
+.wheelbox canvas{width:100%;height:auto;display:block}
+.wheelptr{position:absolute;left:50%;top:-6px;transform:translateX(-50%);font-size:26px;color:#1d1d1b;z-index:2;text-shadow:0 2px 0 #fff}
+.lresult{margin-top:12px;background:#fff6dd;border:1px solid #f3dfa3;border-radius:12px;padding:12px;font-size:16px;text-align:center}
+.ladderwrap{overflow-x:auto;padding-bottom:4px}
+.ladder{position:relative;margin:0 auto}
+.ladder svg{position:absolute;left:0;top:0}
+.ladder .lv{stroke:#cfc9bd;stroke-width:3;stroke-linecap:round}
+.ladder .lpath{fill:none;stroke-width:5;stroke-linejoin:round;stroke-linecap:round;stroke-dasharray:2000;stroke-dashoffset:2000;animation:ldraw 1.2s ease-out forwards}
+@keyframes ldraw{to{stroke-dashoffset:0}}
+.lname{position:absolute;top:4px;transform:translateX(-50%);z-index:2;background:#fff;border:2px solid;border-radius:8px;padding:4px 6px;font-size:12px;font-weight:800;white-space:nowrap;max-width:62px;overflow:hidden;text-overflow:ellipsis}
+.lname.done{background:#1d1d1b;color:#fff}
+.lprize{position:absolute;bottom:4px;transform:translateX(-50%);font-size:13px;font-weight:800;color:var(--sub);background:#fff;border:1px solid var(--line);border-radius:8px;padding:4px 7px;white-space:nowrap}
+.lprize.hit{background:#fff1d6;border-color:#f0b400;color:#1d1d1b;font-size:16px}
+.lprize.miss{opacity:.6}
+.lcard b{font-size:15px}

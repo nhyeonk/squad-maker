@@ -1,6 +1,6 @@
 // 데이터 저장소: 로컬(localStorage) 또는 Firebase Firestore (실시간 공유)
 import { FIREBASE_CONFIG, GROUP_ID, FIREBASE_SDK_VERSION, STORAGE_KEY, CONFIG_KEY } from "./config.js";
-import { S, hooks, defaultLineup } from "./state.js";
+import { S, hooks, defaultLineup, bumpData } from "./state.js";
 import { toast } from "./utils.js";
 
 let FB = null; // { db, fs, au, auth, gid }
@@ -40,22 +40,26 @@ async function remote(fn) {
 
 export const api = {
   putPlayer(p) {
+    bumpData();
     S.players[p.id] = p;
     if (FB) return remote(() => FB.fs.setDoc(ref("players", p.id), plain(p)));
     saveLocal();
   },
   delPlayer(id) {
+    bumpData();
     delete S.players[id];
     if (FB) return remote(() => FB.fs.deleteDoc(ref("players", id)));
     saveLocal();
   },
   putMatch(m) {
+    bumpData();
     m.updatedAt = Date.now();
     S.matches[m.id] = m;
     if (FB) return remote(() => FB.fs.setDoc(ref("matches", m.id), plain(m)));
     saveLocal();
   },
   delMatch(id) {
+    bumpData();
     delete S.matches[id];
     if (FB) return remote(() => FB.fs.deleteDoc(ref("matches", id)));
     saveLocal();
@@ -186,11 +190,25 @@ function watchRequests() {
   reqMode = mode;
   S.requests = [];
   S.myRequest = null;
+  S.requestsError = null;
   if (mode === "owner") {
+    let first = true;
     unsubReq = FB.fs.onSnapshot(requestsCol(), (snap) => {
+      const before = S.requests.length;
       S.requests = snap.docs.map((d) => ({ uid: d.id, ...d.data() })).sort((a, b) => a.at - b.at);
+      S.requestsError = null;
+      // 앱을 켜 둔 상태에서 새 신청이 오면 바로 알려줘요
+      if (!first && S.requests.length > before) {
+        const r = S.requests[S.requests.length - 1];
+        toast(`✋ ${r.name || r.email}님이 기록자 신청을 했어요`);
+      }
+      first = false;
       hooks.render();
-    }, (e) => console.warn(e));
+    }, (e) => {
+      console.warn(e);
+      S.requestsError = e.code || e.message; // 대부분 firestore.rules가 예전 버전일 때 (permission-denied)
+      hooks.render();
+    });
   } else if (mode === "self") {
     unsubReq = FB.fs.onSnapshot(myRequestRef(), (d) => {
       S.myRequest = d.exists() ? d.data() : null;
@@ -282,8 +300,8 @@ export async function initFirebase(cfg) {
     return o;
   };
 
-  fs.onSnapshot(col("players"), (snap) => { S.players = toObj(snap); loadedOne(); hooks.scheduleRender(); }, onErr);
-  fs.onSnapshot(col("matches"), (snap) => { S.matches = toObj(snap); loadedOne(); hooks.scheduleRender(); }, onErr);
+  fs.onSnapshot(col("players"), (snap) => { S.players = toObj(snap); bumpData(); loadedOne(); hooks.scheduleRender(); }, onErr);
+  fs.onSnapshot(col("matches"), (snap) => { S.matches = toObj(snap); bumpData(); loadedOne(); hooks.scheduleRender(); }, onErr);
   fs.onSnapshot(ref("meta", "lineup"), (d) => {
     if (!d.metadata.hasPendingWrites && !lineupDirty) S.lineup = d.exists() ? d.data() : S.lineup || defaultLineup();
     loadedOne();
@@ -296,4 +314,5 @@ export function useLocal() {
   S.mode = "local";
   S.canEdit = true;
   Object.assign(S, loadLocal());
+  bumpData();
 }
