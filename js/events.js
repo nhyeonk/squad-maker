@@ -7,7 +7,7 @@ import { ensurePlayer, findByName, parseNames } from "./players.js";
 import { recognizeNames } from "./ocr.js";
 import { locate, removeFrom, movePlayer, autoPlace, relayoutAll, balanceSplit, fillEmpty, teamPlayers, poolList, currentSlots, setSlotLayout, resetSlotLayout, teamSkillSum } from "./lineup.js";
 import { roleOfLabel } from "./formations.js";
-import { createMatchFromLineup, createBlankMatch, addGoal, removeGoal, addToMatch, removeFromMatch, updateMatchField } from "./matches.js";
+import { shortDate, createMatchFromLineup, createBlankMatch, addGoal, removeGoal, addToMatch, removeFromMatch, updateMatchField } from "./matches.js";
 import { lineupText, saveCanvasImage, copyCanvasImage, exportBackup, importBackup, mergeData } from "./share.js";
 import * as M from "./views/modals.js";
 import * as LD from "./views/laundry.js";
@@ -250,6 +250,13 @@ const actions = {
     pk.shift();
     pk.push(+v);
     M.redrawStart();
+  },
+  mplace(v) {
+    // 최근 장소 버튼: 이름 앞 날짜는 그대로 두고 장소만 바꿔요
+    const inp = $("#mtitle");
+    const date = (inp.value.match(/^\d{2}\.\d{1,2}\.\d{1,2}/) || [shortDate()])[0];
+    inp.value = `${date} ${v}`;
+    inp.focus();
   },
   mcreate() {
     const [a, b] = S.ui.mpick;

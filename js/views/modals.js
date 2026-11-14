@@ -4,6 +4,7 @@ import { POS, POS_KO, POSITION_GROUPS, PREF_DETAIL, roleOfLabel } from "../forma
 import { computeStats, scoreOf } from "../stats.js";
 import { teamPlayers, currentSlots } from "../lineup.js";
 import { renderSquadCanvas } from "../share.js";
+import { defaultMatchTitle, recentPlaces, shortDate } from "../matches.js";
 import { getCfg, groupId } from "../store.js";
 import { GROUP_ID, APP_VERSION } from "../config.js";
 import { $, esc, fmtDate, todayStr } from "../utils.js";
@@ -106,13 +107,21 @@ export function openStartMatch() {
 }
 export function redrawStart() {
   const l = lineup();
-  const todayCount = Object.values(S.matches).filter((m) => m.date === todayStr()).length;
+  const keep = document.getElementById("mtitle")?.value; // 팀을 바꿔 다시 그릴 때 쓰던 이름 유지
+  const title = keep ?? defaultMatchTitle();
+  const places = recentPlaces();
   openModal(`<h2>경기 시작${closeBtn}</h2>
     ${l.teams.length > 2 ? `<div class="sec"><label>어느 두 팀이 붙나요?</label><div class="pick">${l.teams
       .map((T, i) => `<button class="${S.ui.mpick.includes(i) ? "on" : ""}" data-act="mpick" data-v="${i}">${esc(T.name)} (${teamPlayers(T).filter(P).length})</button>`)
       .join("")}</div></div>` : ""}
-    <div class="sec"><label>경기 이름 (선택)</label><input class="in" id="mtitle" value="${todayCount + 1}경기"></div>
+    <div class="sec"><label>경기 이름 · 날짜는 자동, 뒤에 장소를 써요</label>
+      <input class="in" id="mtitle" value="${esc(title)}" placeholder="${shortDate()} 운동장 이름" autocomplete="off">
+      ${places.length ? `<div class="chips" style="margin-top:8px">${places.map((p) => `<button class="chip ghost" data-act="mplace" data-v="${esc(p)}">📍 ${esc(p)}</button>`).join("")}</div>` : ""}
+    </div>
     <button class="btn pri block" data-act="mcreate">시작</button>`);
+  // 커서를 맨 뒤로 → 바로 장소를 이어서 쓸 수 있게
+  const inp = document.getElementById("mtitle");
+  if (inp && keep === undefined) setTimeout(() => { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }, 50);
 }
 
 /* ---------- 경기에 선수 추가 ---------- */
