@@ -10,7 +10,7 @@ const SORTS = [
   ["ap", "공격P"],
   ["apps", "출전"],
   ["rate", "승률"],
-  ["skill", "실력"],
+  ["skill", "평점"],
 ];
 const PERIODS = [
   ["all", "전체"],
@@ -87,7 +87,7 @@ export function viewPlayers() {
       <button class="btn sm ghost" data-act="bulkcancel">취소</button>
       <button class="btn sm red" data-act="bulkdelete" ${picked.size ? "" : "disabled"}>${picked.size}명 삭제</button></div>` : ""}
     ${rows.length
-      ? `<div class="tbw"><table class="tb"><thead><tr><th>#</th><th>이름</th><th>실력</th><th>추천 포지션</th><th>선호</th><th>경기</th><th>승-무-패</th><th>승률</th><th>골</th><th>도움</th><th>공격P</th></tr></thead><tbody>${tr}</tbody></table></div>`
+      ? `<div class="tbw"><table class="tb"><thead><tr><th>#</th><th>이름</th><th>평점</th><th>추천 포지션</th><th>선호</th><th>경기</th><th>승-무-패</th><th>승률</th><th>골</th><th>도움</th><th>공격P</th></tr></thead><tbody>${tr}</tbody></table></div>`
       : `<div class="card empty">아직 선수가 없어요.</div>`}
     <p class="hint">이름을 누르면 선호 포지션·실력을 바꾸고 경기별 기록을 볼 수 있어요. 추천 포지션은 실제 경기에서 많이 뛴 자리예요. 승패는 '종료'된 경기만 계산해요.</p>`;
 }
