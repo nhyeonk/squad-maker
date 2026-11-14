@@ -5,18 +5,13 @@ import { uid } from "./utils.js";
 
 export const findByName = (name) => Object.values(S.players).find((p) => p.name === name.trim());
 
-export const TIERS = ["S", "A", "B", "C", "F"];
-export const playerTier = (p) => Number.isInteger(p?.skill) ? TIERS[5 - p.skill] || "" : "";
-export const skillForTier = (tier) => TIERS.includes(tier) ? 5 - TIERS.indexOf(tier) : null;
-export const balanceSkill = (id) => playerTier(S.players[id]) ? S.players[id].skill : 3;
-
 /** 이름으로 선수를 찾고, 없으면 새로 만들어요 (같은 이름 = 같은 선수) */
 export function ensurePlayer(name) {
   name = name.trim().slice(0, 20);
   if (!name) return null;
   let p = findByName(name);
   if (!p) {
-    p = { id: uid(), name, pos: [], createdAt: Date.now() };
+    p = { id: uid(), name, pos: [], skill: 3, createdAt: Date.now() };
     api.putPlayer(p);
   }
   return p;

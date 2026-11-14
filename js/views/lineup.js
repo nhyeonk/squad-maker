@@ -4,8 +4,7 @@ import { FORMATIONS, FUTSAL_MAX } from "../formations.js";
 import { currentSlots, teamPlayers, poolList, locate } from "../lineup.js";
 import { esc } from "../utils.js";
 import { attendanceCounts, computeStats } from "../stats.js";
-import { balanceSkill } from "../players.js";
-import { posBadge, dot, tierBadge } from "./common.js";
+import { posBadge, dot } from "./common.js";
 
 const isSel = (pid) => S.ui.sel === pid;
 
@@ -51,7 +50,7 @@ function pitch(l, T, slots) {
       const n = p ? badgeValue(st, pid) : 0;
       return `<button class="slot ${p ? "filled" : ""} ${p && isSel(pid) ? "sel" : ""} ${sel && !p ? "target" : ""}"
         style="left:${s.x}%;top:${s.y}%;--tc:${T.color}" data-act="slot" data-v="${i}" data-drag="${i}">
-        <span class="cir role-${s.role}">${p ? `<span class="rl">${esc(s.label)}</span>${tierBadge(pid)}${n ? `<span class="nb">${n}</span>` : ""}` : esc(s.label)}</span>
+        <span class="cir role-${s.role}">${p ? `<span class="rl">${esc(s.label)}</span>${n ? `<span class="nb">${n}</span>` : ""}` : esc(s.label)}</span>
         ${p ? `<span class="nm">${esc(p.name)}</span>` : ""}</button>`;
     })
     .join("");
@@ -63,7 +62,7 @@ function pitch(l, T, slots) {
 function side(l, T) {
   const bench = T.bench
     .filter(P)
-    .map((pid) => `<button class="bchip ${isSel(pid) ? "sel" : ""}" data-act="pl" data-v="${pid}" data-pdrag="${pid}">${tierBadge(pid)} ${esc(pname(pid))}</button>`)
+    .map((pid) => `<button class="bchip ${isSel(pid) ? "sel" : ""}" data-act="pl" data-v="${pid}" data-pdrag="${pid}">${esc(pname(pid))}</button>`)
     .join("");
   return `<div class="side">
     <div class="sidebox"><b><span class="pb GK">심</span>심판</b><div style="font-size:11px;opacity:.7;margin-bottom:5px">모든 팀 공통</div>
@@ -104,15 +103,15 @@ function poolCard(l) {
   return `<div class="card" data-drop="pool">
     <h3>대기 명단 <span class="badge">${pool.length}명</span></h3>
     ${pool.length
-      ? `<div class="chips">${pool.map((id) => `<button class="chip ${isSel(id) ? "sel" : ""}" data-act="pl" data-v="${id}" data-pdrag="${id}">${tierBadge(id)}${posBadge(id)} ${esc(pname(id))}<span class="x" data-act="unattend" data-v="${id}" data-edit>×</span></button>`).join("")}</div>`
+      ? `<div class="chips">${pool.map((id) => `<button class="chip ${isSel(id) ? "sel" : ""}" data-act="pl" data-v="${id}" data-pdrag="${id}">${posBadge(id)} ${esc(pname(id))}<span class="x" data-act="unattend" data-v="${id}" data-edit>×</span></button>`).join("")}</div>`
       : `<div class="empty">${l.attendees.length ? "모두 팀에 배치됐어요." : "먼저 위에서 참가자 이름을 추가하세요."}</div>`}
     <div class="grid2" style="margin-top:12px" data-edit>
-      <button class="btn pri" data-act="split">⚖️ 티어 균형 배정</button>
+      <button class="btn pri" data-act="split">⚖️ ${l.teams.length}팀 밸런스 나누기</button>
       <button class="btn" data-act="fill">빈자리 채우기</button>
       <button class="btn" data-act="clearteam">이 팀 비우기</button>
       <button class="btn" data-act="resetall">전체 초기화</button>
     </div>
-    <p class="hint" data-edit>선수를 <b>끌어서</b> 경기장·후보·팀 명단으로 옮길 수 있어요. 폰에서는 살짝 길게 눌렀다가 끌어요.</p>
+    <p class="hint" data-edit>선수를 <b>끌어서</b> 경기장·후보·팀 명단으로 옮길 수 있어요. 폰에서는 살짝 길게 눌렀다가 끌어요. 밸런스 나누기는 실력(★)과 선호 포지션을 보고 나눠요.</p>
   </div>`;
 }
 
@@ -123,7 +122,7 @@ function teamsCard(l, t, slots) {
     .map((x, i) => {
       const ids = teamPlayers(x).filter(P);
       const canDrop = sel && selLoc && !(selLoc.kind !== "pool" && selLoc.team === i);
-      const avg = ids.length ? (ids.reduce((a, id) => a + balanceSkill(id), 0) / ids.length).toFixed(1) : "-";
+      const avg = ids.length ? (ids.reduce((a, id) => a + (P(id).skill || 3), 0) / ids.length).toFixed(1) : "-";
       const action = canDrop
         ? `<button class="btn sm pri" data-act="toteam" data-v="${i}">여기로 이동</button>`
         : i === t
@@ -134,13 +133,13 @@ function teamsCard(l, t, slots) {
             .map((id) => {
               const lc = locate(id);
               const role = lc?.kind === "slot" ? currentSlots(i)[lc.slot]?.label : "후보";
-              return `<button class="chip ${isSel(id) ? "sel" : ""}" data-act="pl" data-v="${id}" data-pdrag="${id}">${tierBadge(id)}${esc(pname(id))} <span style="font-size:10.5px;color:var(--sub)">${esc(role)}</span></button>`;
+              return `<button class="chip ${isSel(id) ? "sel" : ""}" data-act="pl" data-v="${id}" data-pdrag="${id}">${esc(pname(id))} <span style="font-size:10.5px;color:var(--sub)">${esc(role)}</span></button>`;
             })
             .join("")
         : `<span class="hint" style="margin:0">아직 배치된 선수가 없어요.</span>`;
       return `<div class="tcard ${i === t ? "on" : ""} ${canDrop ? "drop" : ""}" data-drop="team:${i}">
         <div class="th">${dot(x.color)}${esc(x.name)} <span class="badge">${ids.length}명</span>
-          <span style="font-size:11.5px;color:var(--sub);font-weight:600">평균 ${avg}점</span><span class="sp"></span>${action}</div>
+          <span style="font-size:11.5px;color:var(--sub);font-weight:600">평균 ★${avg}</span><span class="sp"></span>${action}</div>
         <div class="chips">${chips}</div></div>`;
     })
     .join("");
