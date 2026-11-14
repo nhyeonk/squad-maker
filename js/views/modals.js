@@ -73,7 +73,7 @@ export function openPlayer(pid) {
     ${ed ? "" : `<div class="banner" style="margin-bottom:12px">👀 보기 전용이라 바꿀 수 없어요. ⚙️ 설정에서 구글로 로그인하면 바꿀 수 있어요.</div>`}
     <div class="sec ${ed ? "" : "ro-dim"}"><button class="btn block ${p.regular ? "pri" : "ghost"}" data-act="pregular" data-v="${pid}" ${dis}>${p.regular ? "⭐ 고정 참여 (눌러서 해제)" : "☆ 고정 참여로 지정"}</button></div>
     <div class="sec ${ed ? "" : "ro-dim"}"><label>선호 포지션 · 누른 순서가 우선순위예요 (다시 누르면 해제)</label><div class="posbtns">${posBtns}</div>${detailRow}${chosen}</div>
-    <div class="sec ${S.isAdmin ? "" : "ro-dim"}"><label>평점 (팀 밸런스용 · ${S.isAdmin ? "별을 누를 때마다 반 별 → 한 별 → 빈 별" : "관리자만 바꿀 수 있어요"})</label><div class="stars">${stars}</div></div>
+    <div class="sec ${ed ? "" : "ro-dim"}"><label>평점 (팀 밸런스용 · 별을 누를 때마다 반 별 → 한 별 → 빈 별)</label><div class="stars">${stars}</div></div>
     <div class="sec"><label>기록</label>
       <div style="font-size:14px;font-weight:700">${s.apps || 0}경기 · ${s.goals || 0}골 · ${s.ast || 0}도움 · ${s.w || 0}승 ${s.d || 0}무 ${s.l || 0}패${s.laundry ? ` · 🧺 빨래 ${s.laundry}회` : ""}</div>${hist}</div>
     ${ed ? `<div class="row"><button class="btn pri" data-act="psave" data-v="${pid}" style="flex:1">이름 저장</button><button class="btn danger" data-act="pdel" data-v="${pid}" data-admin>선수 삭제</button></div>` : ""}`);
@@ -231,8 +231,8 @@ function accountSection() {
     : S.isOwner
       ? `<p class="hint">👑 <b>최고 관리자</b>예요. 아래에서 관리자를 지정할 수 있어요.</p>`
       : S.isAdmin
-        ? `<p class="hint">🛡️ <b>관리자</b>예요. 경기·선수 삭제와 별점 수정도 할 수 있어요.</p>`
-        : `<p class="hint">✏️ <b>일반 회원</b>이에요. 골·라인업·팀 나누기를 기록할 수 있어요. (경기·선수 삭제, 별점 수정은 관리자만)</p>`;
+        ? `<p class="hint">🛡️ <b>관리자</b>예요. 경기·선수 삭제와 백업 불러오기도 할 수 있어요.</p>`
+        : `<p class="hint">✏️ <b>일반 회원</b>이에요. 골·라인업·팀 나누기를 기록할 수 있어요. (경기·선수 삭제는 관리자만)</p>`;
   return `<div class="sec"><label>내 계정 <span class="badge">${email}</span></label>${role}
     <button class="btn block" style="margin-top:8px" data-act="logout">로그아웃</button></div>`;
 }
@@ -255,7 +255,7 @@ function adminsSection() {
       ${list.map((e) => `<div class="recrow"><span title="${esc(e)}">${esc(maskEmail(e))}</span><button class="recdel" data-act="recdel" data-v="${esc(e)}" aria-label="해제">×</button></div>`).join("")}
     </div>
     <form class="row" data-act="recadd" style="margin-top:10px"><input class="in" name="n" type="email" placeholder="관리자로 지정할 구글 이메일"><button class="btn pri">추가</button></form>
-    <p class="hint">관리자는 경기·선수 삭제, 별점 수정, 백업 불러오기를 할 수 있어요. 나머지 사람은 로그인만 하면 일반 회원이에요.</p>
+    <p class="hint">관리자는 경기·선수 삭제, 백업 불러오기를 할 수 있어요. 나머지 사람은 로그인만 하면 일반 회원이에요.</p>
   </details></div>`;
 }
 

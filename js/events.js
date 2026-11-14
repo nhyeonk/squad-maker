@@ -30,7 +30,7 @@ function viewOnlyReason() {
 }
 
 /* 관리자만 할 수 있는 동작 (서버 규칙으로도 막혀 있어요) */
-const ADMIN_ONLY = new Set(["delmatch", "pdel", "bulkstart", "bulkdelete", "pstar", "pstep", "import", "upload"]);
+const ADMIN_ONLY = new Set(["delmatch", "pdel", "bulkstart", "bulkdelete", "import", "upload"]);
 
 /* 보기 전용일 때 막을 동작 */
 const EDIT_ONLY = new Set([

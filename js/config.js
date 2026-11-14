@@ -27,4 +27,4 @@ export const STORAGE_KEY = "squadmaker_v1";
 export const CONFIG_KEY = "squadmaker_cfg";
 
 /** 앱 버전 (⚙️ 설정 맨 아래에 보여요). 수정해서 올릴 때 이 숫자만 올리면 폰에도 새 버전이 깔려요 */
-export const APP_VERSION = "v27";
+export const APP_VERSION = "v28";
