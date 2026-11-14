@@ -10,25 +10,24 @@ import { openSettings } from "./views/modals.js";
 function renderChrome() {
   const sync = $("#sync");
   if (S.mode === "local") [sync.className, sync.textContent] = ["sync", "이 폰에만 저장"];
-  else if (S.canEdit) [sync.className, sync.textContent] = ["sync live", "● 실시간 · 기록자"];
+  else if (S.isOwner) [sync.className, sync.textContent] = ["sync live", "● 실시간 · 👑 관리자"];
+  else if (S.isAdmin) [sync.className, sync.textContent] = ["sync live", "● 실시간 · 🛡️ 관리자"];
+  else if (S.canEdit) [sync.className, sync.textContent] = ["sync live", "● 실시간 · 회원"];
   else [sync.className, sync.textContent] = ["sync ro", "● 실시간 · 보기 전용"];
 
-  document.body.classList.toggle("ro", !S.canEdit);
-  // 관리자에게 기록자 신청이 오면 설정 버튼에 빨간 점
-  document.querySelector('[data-act="settings"]')?.classList.toggle("has-dot", S.isOwner && (S.requests || []).length > 0);
+  document.body.classList.toggle("ro", !S.canEdit); // 로그인 전: 입력 버튼 숨김
+  document.body.classList.toggle("notadmin", !S.isAdmin); // 관리자 아님: 삭제·별점 버튼 숨김
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.v === S.ui.tab));
 
-  const reqs = S.isOwner ? (S.requests || []).length : 0;
-  $("#banner").innerHTML = reqs
-    ? `<div class="banner reqbanner"><span class="sp">✋ 기록자 신청이 <b>${reqs}건</b> 있어요.</span><button class="btn sm pri" data-act="settings">확인하기</button></div>`
-    : S.mode === "remote" && !S.canEdit
-      ? `<div class="banner"><span class="sp">보기 전용이에요. 기록을 입력하려면 ⚙️ 설정에서 로그인하세요.</span><button class="btn sm ghost" data-act="settings">로그인</button></div>`
+  $("#banner").innerHTML =
+    S.mode === "remote" && !S.canEdit
+      ? `<div class="banner"><span class="sp">보기 전용이에요. 구글로 로그인하면 바로 기록할 수 있어요.</span><button class="btn sm ghost" data-act="settings">로그인</button></div>`
       : "";
 
   $("#foot").innerHTML =
     S.mode === "local"
       ? `기록은 이 폰(브라우저)에만 저장돼요. 친구들과 같이 보려면 ⚙️ 설정에서 서버를 연결하세요.<br>
-         <button class="btn sm ghost" data-act="export">백업 파일 저장</button> <button class="btn sm ghost" data-act="import" data-edit>백업 불러오기</button>`
+         <button class="btn sm ghost" data-act="export">백업 파일 저장</button> <button class="btn sm ghost" data-act="import" data-admin>백업 불러오기</button>`
       : `기록이 서버에 저장되고 같은 링크를 연 모두에게 실시간으로 보여요.<br>
          <button class="btn sm ghost" data-act="share">공유 링크 복사</button> <button class="btn sm ghost" data-act="export">백업 파일 저장</button>`;
 }

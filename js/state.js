@@ -30,10 +30,10 @@ export const S = {
   mode: "local", // "local" | "remote"
   canEdit: true,
   user: null,
-  recorders: null, // { owner, emails[] } (Firebase 모드)
-  isOwner: false,
-  requests: [], // 관리자에게 보이는 기록자 신청 목록
-  myRequest: null, // 내가 보낸 기록자 신청
+  roles: null, // { owner, admins[] } (Firebase 모드, 관리자만 읽을 수 있어요)
+  rolesLoaded: false,
+  isOwner: false, // 👑 최고 관리자
+  isAdmin: true, // 🛡️ 관리자 (이 폰에만 저장하는 모드에서는 모두 관리자)
   ready: false,
 };
 

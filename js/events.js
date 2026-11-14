@@ -1,7 +1,7 @@
 // 버튼·입력 이벤트 처리
 // HTML의 data-act="이름" 버튼을 누르면 아래 actions["이름"]이 실행돼요. (data-v 값이 v로 들어와요)
 import { S, P, lineup, defaultLineup, mkTeam } from "./state.js";
-import { api, parseConfig, saveCfg, clearCfg, shareLink, login, logout, loginGoogle, claimOwner, setRecorders, loadLocal, requestAccess, cancelRequest, approveRequest, rejectRequest } from "./store.js";
+import { api, parseConfig, saveCfg, clearCfg, shareLink, login, logout, loginGoogle, setAdmins, loadLocal } from "./store.js";
 import { FORMATIONS } from "./formations.js";
 import { ensurePlayer, findByName, parseNames } from "./players.js";
 import { recognizeNames } from "./ocr.js";
@@ -18,9 +18,11 @@ import { $, copyText, toast } from "./utils.js";
 /** 보기 전용일 때 왜 안 되는지 */
 function viewOnlyReason() {
   if (S.mode === "remote" && !S.user) return "보기 전용이에요. ⚙️ 설정에서 구글로 로그인하세요";
-  if (S.mode === "remote") return "기록자만 바꿀 수 있어요. ⚙️ 설정에서 기록자 신청을 해주세요";
   return "보기 전용이에요";
 }
+
+/* 관리자만 할 수 있는 동작 (서버 규칙으로도 막혀 있어요) */
+const ADMIN_ONLY = new Set(["delmatch", "pdel", "bulkstart", "bulkdelete", "pskill", "import", "upload"]);
 
 /* 보기 전용일 때 막을 동작 */
 const EDIT_ONLY = new Set([
@@ -530,46 +532,9 @@ const actions = {
       toast(e.code === "auth/unauthorized-domain" ? "이 주소가 Firebase 승인된 도메인에 없어요 (README 참고)" : e.code === "auth/popup-closed-by-user" ? "로그인을 취소했어요" : "로그인 실패: " + (e.code || e.message));
     }
   },
-  async claimowner() {
-    try {
-      await claimOwner();
-      toast("관리자로 등록했어요");
-      setTimeout(M.openSettings, 400);
-    } catch (e) {
-      toast(e.code === "permission-denied" ? "firestore.rules에 적은 관리자 이메일이 아니에요" : "실패: " + (e.code || e.message));
-    }
-  },
-  async reqsend() {
-    try {
-      await requestAccess();
-      toast("기록자 신청을 보냈어요. 관리자가 승인하면 바로 입력할 수 있어요");
-    } catch (e) {
-      console.error(e);
-      toast(e.code === "permission-denied"
-        ? "신청이 막혔어요. 관리자에게 Firebase 규칙을 최신으로 게시해 달라고 해주세요"
-        : "신청 실패: " + (e.code || e.message));
-    }
-  },
-  async reqcancel() {
-    await cancelRequest().catch((e) => toast("실패: " + e.code));
-  },
-  async reqok(v) {
-    const r = S.requests.find((x) => x.uid === v);
-    try {
-      await approveRequest(v);
-      toast(`${r?.name || "신청자"}님을 기록자로 승인했어요`);
-    } catch (e) {
-      toast("실패: " + (e.code || e.message));
-    }
-  },
-  async reqno(v) {
-    const r = S.requests.find((x) => x.uid === v);
-    if (!confirm(`${r?.name || "이 사람"}의 신청을 거절할까요?`)) return;
-    await rejectRequest(v).catch((e) => toast("실패: " + e.code));
-  },
   async recdel(v) {
-    if (!confirm(`${M.maskEmail(v)}을(를) 기록자에서 뺄까요?`)) return;
-    await setRecorders((S.recorders.emails || []).filter((x) => x !== v)).catch((e) => toast("실패: " + e.code));
+    if (!confirm(`${M.maskEmail(v)}을(를) 관리자에서 해제할까요? (일반 회원이 돼요)`)) return;
+    await setAdmins((S.roles?.admins || []).filter((x) => x !== v)).catch((e) => toast("실패: " + e.code));
     M.openSettings();
   },
   async upload() {
@@ -637,8 +602,8 @@ const forms = {
     const email = f.n.value.trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast("이메일 형식을 확인하세요");
     try {
-      await setRecorders([...(S.recorders.emails || []), email]);
-      toast("기록자를 추가했어요");
+      await setAdmins([...(S.roles?.admins || []), email]);
+      toast("관리자로 지정했어요");
       S.ui.recordersOpen = true;
       M.openSettings();
     } catch (e) {
@@ -701,6 +666,7 @@ export function bindEvents() {
     e.preventDefault();
     e.stopPropagation();
     if (EDIT_ONLY.has(act) && !S.canEdit) return toast(viewOnlyReason());
+    if (ADMIN_ONLY.has(act) && !S.isAdmin) return toast("관리자만 할 수 있어요");
     const fn = actions[act];
     if (fn) await fn(el.dataset.v);
   });
@@ -710,7 +676,8 @@ export function bindEvents() {
     const f = e.target;
     const fn = forms[f.dataset.act];
     if (!fn) return;
-    if (!["login", "recadd"].includes(f.dataset.act) && !S.canEdit) return toast(viewOnlyReason());
+    if (f.dataset.act !== "login" && !S.canEdit) return toast(viewOnlyReason());
+    if (f.dataset.act === "recadd" && !S.isOwner) return toast("최고 관리자만 할 수 있어요");
     await fn(f);
     if (f.n) f.n.value = "";
   });

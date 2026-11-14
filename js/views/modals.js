@@ -66,13 +66,13 @@ export function openPlayer(pid) {
     .join("") + `<b class="skn">${sk.toFixed(1)}</b>`;
 
   openModal(`<h2>${ed ? `<input class="in" id="pnm" value="${esc(p.name)}" style="font-weight:800;font-size:17px">` : esc(p.name)}${closeBtn}</h2>
-    ${ed ? "" : `<div class="banner" style="margin-bottom:12px">👀 보기 전용이라 바꿀 수 없어요. ⚙️ 설정에서 기록자로 로그인하면 바꿀 수 있어요.</div>`}
+    ${ed ? "" : `<div class="banner" style="margin-bottom:12px">👀 보기 전용이라 바꿀 수 없어요. ⚙️ 설정에서 구글로 로그인하면 바꿀 수 있어요.</div>`}
     <div class="sec ${ed ? "" : "ro-dim"}"><button class="btn block ${p.regular ? "pri" : "ghost"}" data-act="pregular" data-v="${pid}" ${dis}>${p.regular ? "⭐ 고정 참여 (눌러서 해제)" : "☆ 고정 참여로 지정"}</button></div>
     <div class="sec ${ed ? "" : "ro-dim"}"><label>선호 포지션 · 누른 순서가 우선순위예요 (다시 누르면 해제)</label><div class="posbtns">${posBtns}</div>${detailRow}${chosen}</div>
-    <div class="sec ${ed ? "" : "ro-dim"}"><label>실력 (팀 밸런스용 · 별 왼쪽 절반을 누르면 0.5점)</label><div class="stars">${stars}</div></div>
+    <div class="sec ${S.isAdmin ? "" : "ro-dim"}"><label>실력 (팀 밸런스용 · ${S.isAdmin ? "별 왼쪽 절반을 누르면 0.5점" : "관리자만 바꿀 수 있어요"})</label><div class="stars">${stars}</div></div>
     <div class="sec"><label>기록</label>
       <div style="font-size:14px;font-weight:700">${s.apps || 0}경기 · ${s.goals || 0}골 · ${s.ast || 0}도움 · ${s.w || 0}승 ${s.d || 0}무 ${s.l || 0}패${s.laundry ? ` · 🧺 빨래 ${s.laundry}회` : ""}</div>${hist}</div>
-    ${ed ? `<div class="row"><button class="btn pri" data-act="psave" data-v="${pid}" style="flex:1">이름 저장</button><button class="btn danger" data-act="pdel" data-v="${pid}">선수 삭제</button></div>` : ""}`);
+    ${ed ? `<div class="row"><button class="btn pri" data-act="psave" data-v="${pid}" style="flex:1">이름 저장</button><button class="btn danger" data-act="pdel" data-v="${pid}" data-admin>선수 삭제</button></div>` : ""}`);
 }
 
 /* ---------- 골 입력 ---------- */
@@ -148,7 +148,7 @@ export function openSettings() {
   S.ui.settingsOpen = true;
   const c = getCfg();
   const backup = `<div class="sec" style="margin-top:16px"><label>백업</label><div class="grid2">
-    <button class="btn" data-act="export">백업 파일 저장</button><button class="btn" data-act="import" data-edit>백업 불러오기</button></div></div>
+    <button class="btn" data-act="export">백업 파일 저장</button><button class="btn" data-act="import" data-admin>백업 불러오기</button></div></div>
     <p class="hint" style="text-align:center">스쿼드 메이커 ${APP_VERSION}</p>`;
 
   if (S.mode === "remote") {
@@ -156,8 +156,8 @@ export function openSettings() {
       <div class="sec"><label>친구 초대</label><button class="btn pri block" data-act="share">🔗 공유 링크 복사</button>
         <p class="hint">이 링크를 단톡방에 올리면 누구나 로그인 없이 실시간으로 볼 수 있어요.</p></div>
       ${accountSection()}
-      ${S.isOwner ? recordersSection() : ""}
-      ${S.canEdit ? `<div class="sec"><label>이 폰의 예전 기록 올리기</label><button class="btn block" data-act="upload">이 폰에 저장된 기록을 서버로 합치기</button></div>` : ""}
+      ${S.isOwner ? adminsSection() : ""}
+      ${S.isAdmin ? `<div class="sec"><label>이 폰의 예전 기록 올리기</label><button class="btn block" data-act="upload">이 폰에 저장된 기록을 서버로 합치기</button></div>` : ""}
       <div class="sec"><label>그룹 ID</label><code>${esc(groupId())}</code></div>
       <button class="btn danger block" data-act="disconnect">서버 연결 해제 (이 폰만)</button>${backup}`), (S.ui.settingsOpen = true);
   }
@@ -217,26 +217,19 @@ export function updateOcrCount() {
 
 function accountSection() {
   if (!S.user) {
-    return `<div class="sec"><label>기록자 로그인</label>
+    return `<div class="sec"><label>로그인</label>
       <button class="btn block ghost" data-act="googlelogin" style="gap:8px"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>구글로 로그인</button>
-      <p class="hint">관리자가 내 이메일을 기록자로 추가해 두면, 로그인만 하면 바로 입력할 수 있어요.</p>
-</div>`;
+      <p class="hint">구글로 로그인하면 바로 <b>골·라인업·팀 나누기</b>를 기록할 수 있어요. 로그인 안 하면 보기만 돼요.</p></div>`;
   }
   const email = esc(S.user.email || "");
-  let status;
-  if (!S.recordersLoaded) status = `<p class="hint">권한 확인 중…</p>`;
-  else if (S.isOwner) status = `<p class="hint">👑 관리자예요. 아래에서 기록자를 관리하세요.</p>`;
-  else if (S.canEdit) status = `<p class="hint">✏️ 기록자예요. 기록을 입력할 수 있어요.</p>`;
-  else if (!S.recorders && !S.recordersDenied)
-    status = `<p class="hint">아직 관리자가 없어요. firestore.rules에 적은 관리자 이메일이라면 아래 버튼을 누르세요.</p>
-      <button class="btn pri block" data-act="claimowner">👑 이 계정을 관리자로 등록</button>`;
-  else if (S.myRequest)
-    status = `<div class="reqbox"><b>⏳ 기록자 신청 완료</b><span>관리자가 승인하면 바로 입력할 수 있어요.</span>
-      <button class="btn sm ghost" data-act="reqcancel">신청 취소</button></div>`;
-  else
-    status = `<p class="hint">👀 보기 전용이에요. 기록을 입력하고 싶으면 신청하세요. 관리자가 승인하면 바로 입력할 수 있어요.</p>
-      <button class="btn pri block" data-act="reqsend">✋ 기록자 신청하기</button>`;
-  return `<div class="sec"><label>내 계정 <span class="badge">${email}</span></label>${status}
+  const role = !S.rolesLoaded
+    ? `<p class="hint">권한 확인 중…</p>`
+    : S.isOwner
+      ? `<p class="hint">👑 <b>최고 관리자</b>예요. 아래에서 관리자를 지정할 수 있어요.</p>`
+      : S.isAdmin
+        ? `<p class="hint">🛡️ <b>관리자</b>예요. 경기·선수 삭제와 별점 수정도 할 수 있어요.</p>`
+        : `<p class="hint">✏️ <b>일반 회원</b>이에요. 골·라인업·팀 나누기를 기록할 수 있어요. (경기·선수 삭제, 별점 수정은 관리자만)</p>`;
+  return `<div class="sec"><label>내 계정 <span class="badge">${email}</span></label>${role}
     <button class="btn block" style="margin-top:8px" data-act="logout">로그아웃</button></div>`;
 }
 
@@ -248,26 +241,17 @@ export function maskEmail(e = "") {
   return `${shown}@${domain}`;
 }
 
-function recordersSection() {
-  const list = S.recorders?.emails || [];
-  const reqs = S.requests || [];
-  const open = S.ui.recordersOpen || reqs.length || S.requestsError ? "open" : "";
-  const reqHtml = reqs.length
-    ? `<div class="reqlist"><div class="reqtitle">✋ 기록자 신청 ${reqs.length}건</div>${reqs
-        .map((r) => `<div class="reqrow"><div style="min-width:0"><b>${esc(r.name || "(이름 없음)")}</b><small>${esc(r.email)}</small></div>
-          <button class="btn sm pri" data-act="reqok" data-v="${esc(r.uid)}">승인</button><button class="btn sm ghost" data-act="reqno" data-v="${esc(r.uid)}">거절</button></div>`)
-        .join("")}</div>`
-    : "";
+function adminsSection() {
+  const list = S.roles?.admins || [];
+  const open = S.ui.recordersOpen ? "open" : "";
   return `<div class="sec"><details class="recbox" ${open} data-act-toggle="recordersOpen">
-    <summary><span>✏️ 기록자 <b>${list.length + 1}명</b> · 관리${reqs.length ? ` <span class="reqdot">신청 ${reqs.length}</span>` : ""}</span><span class="chev">›</span></summary>
-    ${reqHtml}
-    ${S.requestsError ? `<div class="banner" style="margin:0 0 10px">⚠️ 기록자 신청 목록을 불러오지 못했어요 (${esc(S.requestsError)}).<br>Firebase 콘솔 → Firestore → 규칙에 최신 <code>firestore.rules</code>를 붙여넣고 게시해 주세요.</div>` : ""}
+    <summary><span>🛡️ 관리자 <b>${list.length + 1}명</b> · 관리</span><span class="chev">›</span></summary>
     <div class="reclist">
-      <div class="recrow"><span>👑 ${esc(maskEmail(S.recorders.owner))}</span><span class="rectag">관리자</span></div>
-      ${list.map((e) => `<div class="recrow"><span title="${esc(e)}">${esc(maskEmail(e))}</span><button class="recdel" data-act="recdel" data-v="${esc(e)}" aria-label="삭제">×</button></div>`).join("")}
+      <div class="recrow"><span>👑 ${esc(maskEmail(S.roles?.owner || ""))}</span><span class="rectag">최고 관리자</span></div>
+      ${list.map((e) => `<div class="recrow"><span title="${esc(e)}">${esc(maskEmail(e))}</span><button class="recdel" data-act="recdel" data-v="${esc(e)}" aria-label="해제">×</button></div>`).join("")}
     </div>
-    <form class="row" data-act="recadd" style="margin-top:10px"><input class="in" name="n" type="email" placeholder="이메일로 직접 추가"><button class="btn pri">추가</button></form>
-    <p class="hint">친구가 앱에서 구글로 로그인한 뒤 <b>기록자 신청</b>을 누르면 여기에 떠요.</p>
+    <form class="row" data-act="recadd" style="margin-top:10px"><input class="in" name="n" type="email" placeholder="관리자로 지정할 구글 이메일"><button class="btn pri">추가</button></form>
+    <p class="hint">관리자는 경기·선수 삭제, 별점 수정, 백업 불러오기를 할 수 있어요. 나머지 사람은 로그인만 하면 일반 회원이에요.</p>
   </details></div>`;
 }
 

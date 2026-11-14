@@ -81,7 +81,7 @@ export function viewPlayers() {
       <div class="stat"><b>${goals}</b><span>골</span></div>
       <div class="stat"><b>${Object.keys(S.players).length}</b><span>선수</span></div></div>
     <div class="row" style="flex-wrap:wrap;margin-bottom:10px">${seg(SORTS, key, "sort")}${seg(PERIODS, S.ui.period, "period")}<span style="flex:1"></span>
-      ${bulk ? "" : `<button class="btn sm" data-act="bulkstart" data-edit>여러 명 삭제</button><button class="btn sm pri" data-act="newplayer" data-edit>+ 선수 추가</button>`}</div>
+      ${bulk ? "" : `<button class="btn sm" data-act="bulkstart" data-admin>여러 명 삭제</button><button class="btn sm pri" data-act="newplayer" data-edit>+ 선수 추가</button>`}</div>
     ${bulk ? `<div class="bulkbar"><span><b>${picked.size}명</b> 선택</span><span class="sp"></span>
       <button class="btn sm ghost" data-act="bulkall">${picked.size === rows.length ? "선택 해제" : "전체 선택"}</button>
       <button class="btn sm ghost" data-act="bulkcancel">취소</button>

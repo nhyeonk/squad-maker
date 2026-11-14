@@ -34,7 +34,7 @@ async function remote(fn) {
     await fn();
   } catch (e) {
     console.error(e);
-    toast(e.code === "permission-denied" ? "저장 권한이 없어요. 기록자 계정으로 로그인하세요." : "저장 실패: " + (e.code || e.message));
+    toast(e.code === "permission-denied" ? (S.user ? "관리자만 할 수 있는 작업이에요" : "저장하려면 ⚙️ 설정에서 구글로 로그인하세요") : "저장 실패: " + (e.code || e.message));
   }
 }
 
@@ -126,9 +126,12 @@ export function shareLink() {
   return base + "#join=" + b64e(JSON.stringify({ c: c.config, g: c.gid }));
 }
 
-/* ---------- 로그인 & 기록자 권한 ----------
- * 기록자 명단은 Firestore의 recorders/{그룹ID} 문서에 있어요: { owner: 관리자이메일, emails: [기록자 이메일...] }
- * 관리자 이메일만 firestore.rules에 한 번 적어 두고, 나머지 기록자는 앱 설정에서 추가/삭제해요.
+/* ---------- 로그인 & 권한 ----------
+ * 👀 방문자: 로그인 안 함 → 보기만
+ * ✏️ 일반 회원: 구글 로그인만 하면 자동 → 골·라인업·팀 나누기·경기 만들기 등
+ * 🛡️ 관리자: 최고 관리자가 지정 → + 경기·선수 삭제, 별점 수정, 백업 불러오기
+ * 👑 최고 관리자: firestore.rules에 적은 이메일 → + 관리자 지정·해제
+ * 관리자 명단은 Firestore의 recorders/{그룹ID} 문서: { owner: 최고 관리자 이메일, admins: [관리자 이메일...] }
  */
 export const login = (email, pw) => FB.au.signInWithEmailAndPassword(FB.auth, email, pw);
 export const logout = () => FB.au.signOut(FB.auth);
@@ -148,82 +151,52 @@ export async function loginGoogle() {
 }
 
 const myEmail = () => (S.user?.email || "").toLowerCase();
+const rolesRef = () => FB.fs.doc(FB.db, "recorders", FB.gid);
 
 function updatePermission() {
   const e = myEmail();
-  const r = S.recorders;
+  const r = S.roles;
+  S.canEdit = !!e; // 로그인하면 일반 회원
   S.isOwner = !!e && !!r && r.owner === e;
-  S.canEdit = !!e && !!r && (r.owner === e || (r.emails || []).includes(e));
+  S.isAdmin = S.isOwner || (!!e && !!r && (r.admins || []).includes(e));
 }
 
-const recordersRef = () => FB.fs.doc(FB.db, "recorders", FB.gid);
-const requestsCol = () => FB.fs.collection(FB.db, "requests", FB.gid, "items");
-const myRequestRef = () => FB.fs.doc(FB.db, "requests", FB.gid, "items", S.user.uid);
-
-/* ---------- 기록자 신청 → 관리자 승인 ----------
- * requests/{그룹ID}/items/{신청자uid} = { email, name(구글 이름), at }
- * 신청자 본인과 관리자만 볼 수 있어요.
- */
-export async function requestAccess() {
-  await FB.fs.setDoc(myRequestRef(), { email: myEmail(), name: S.user.displayName || "", at: Date.now() });
-}
-export async function cancelRequest() {
-  await FB.fs.deleteDoc(myRequestRef());
-}
-export async function approveRequest(uid) {
-  const r = S.requests.find((x) => x.uid === uid);
-  if (!r) return;
-  await setRecorders([...(S.recorders.emails || []), r.email]);
-  await FB.fs.deleteDoc(FB.fs.doc(FB.db, "requests", FB.gid, "items", uid));
-}
-export async function rejectRequest(uid) {
-  await FB.fs.deleteDoc(FB.fs.doc(FB.db, "requests", FB.gid, "items", uid));
+/** 관리자 지정·해제 (최고 관리자만, 서버 규칙으로도 막혀 있어요) */
+export async function setAdmins(emails) {
+  const admins = [...new Set(emails.map((x) => x.trim().toLowerCase()).filter(Boolean))];
+  await FB.fs.setDoc(rolesRef(), { owner: S.roles?.owner || myEmail(), admins });
 }
 
-/** 관리자면 신청 목록 전체, 아니면 내 신청만 실시간으로 지켜봐요 */
-let unsubReq = null, reqMode = null;
-function watchRequests() {
-  const mode = !S.user ? null : S.isOwner ? "owner" : S.canEdit ? null : "self";
-  if (mode === reqMode) return;
-  unsubReq?.();
-  unsubReq = null;
-  reqMode = mode;
-  S.requests = [];
-  S.myRequest = null;
-  S.requestsError = null;
-  if (mode === "owner") {
-    let first = true;
-    unsubReq = FB.fs.onSnapshot(requestsCol(), (snap) => {
-      const before = S.requests.length;
-      S.requests = snap.docs.map((d) => ({ uid: d.id, ...d.data() })).sort((a, b) => a.at - b.at);
-      S.requestsError = null;
-      // 앱을 켜 둔 상태에서 새 신청이 오면 바로 알려줘요
-      if (!first && S.requests.length > before) {
-        const r = S.requests[S.requests.length - 1];
-        toast(`✋ ${r.name || r.email}님이 기록자 신청을 했어요`);
+/** 로그인한 사람의 등급을 실시간으로 확인 */
+let unsubRoles = null;
+function watchRoles() {
+  unsubRoles?.();
+  unsubRoles = null;
+  S.roles = null;
+  S.rolesLoaded = !S.user;
+  updatePermission();
+  if (!S.user) return;
+  unsubRoles = FB.fs.onSnapshot(
+    rolesRef(),
+    async (d) => {
+      S.roles = d.exists() ? d.data() : null;
+      S.rolesLoaded = true;
+      // 관리자 명단이 아직 없는데 읽을 수 있었다 = 규칙에 적힌 최고 관리자 → 명단 자동 생성
+      if (!d.exists()) {
+        try { await FB.fs.setDoc(rolesRef(), { owner: myEmail(), admins: [] }); } catch (e) { console.warn(e); }
       }
-      first = false;
+      updatePermission();
       hooks.render();
-    }, (e) => {
-      console.warn(e);
-      S.requestsError = e.code || e.message; // 대부분 firestore.rules가 예전 버전일 때 (permission-denied)
+    },
+    (e) => {
+      // 관리자 명단을 못 읽음 = 일반 회원 (관리자 이메일은 관리자끼리만 볼 수 있어요)
+      if (e.code !== "permission-denied") console.warn(e);
+      S.roles = null;
+      S.rolesLoaded = true;
+      updatePermission();
       hooks.render();
-    });
-  } else if (mode === "self") {
-    unsubReq = FB.fs.onSnapshot(myRequestRef(), (d) => {
-      S.myRequest = d.exists() ? d.data() : null;
-      hooks.render();
-    }, (e) => console.warn(e));
-  }
-}
-
-/** 처음 한 번: 이 계정을 관리자로 등록 (firestore.rules에 적은 관리자만 성공해요) */
-export async function claimOwner() {
-  await FB.fs.setDoc(recordersRef(), { owner: myEmail(), emails: [] });
-}
-export async function setRecorders(emails) {
-  const r = S.recorders;
-  await FB.fs.setDoc(recordersRef(), { owner: r.owner, emails: [...new Set(emails.map((x) => x.trim().toLowerCase()).filter(Boolean))] });
+    }
+  );
 }
 
 /* ---------- Firebase 연결 & 실시간 구독 ---------- */
@@ -245,38 +218,12 @@ export async function initFirebase(cfg) {
   FB = { db, fs, au, auth, gid: cfg.gid || GROUP_ID };
   S.mode = "remote";
   S.canEdit = false;
+  S.isAdmin = false;
 
   au.getRedirectResult(auth).catch((e) => console.warn(e));
-  let unsubRec = null;
   au.onAuthStateChanged(auth, (u) => {
     S.user = u;
-    S.recorders = null;
-    updatePermission();
-    unsubRec?.();
-    unsubRec = null;
-    watchRequests();
-    if (u) {
-      S.recordersLoaded = false;
-      S.recordersDenied = false;
-      unsubRec = fs.onSnapshot(
-        recordersRef(),
-        (d) => {
-          S.recorders = d.exists() ? d.data() : null;
-          S.recordersLoaded = true;
-          updatePermission();
-          watchRequests();
-          hooks.render();
-        },
-        (e) => {
-          // 기록자 명단에 없는 사람은 명단을 못 읽어요 → 보기 전용
-          console.warn(e);
-          S.recordersLoaded = true;
-          S.recordersDenied = e.code === "permission-denied";
-          watchRequests();
-          hooks.render();
-        }
-      );
-    }
+    watchRoles();
     hooks.render();
   });
 
@@ -313,6 +260,7 @@ export function useLocal() {
   FB = null;
   S.mode = "local";
   S.canEdit = true;
+  S.isAdmin = true;
   Object.assign(S, loadLocal());
   bumpData();
 }

@@ -91,5 +91,5 @@ export function viewMatch(m) {
       ${m.status === "done"
         ? `<button class="btn" data-act="mstatus" data-v="live">다시 진행 중으로</button>`
         : `<button class="btn dark" data-act="mstatus" data-v="done">경기 종료</button>`}
-      <button class="btn danger" data-act="delmatch">경기 삭제</button></div>`;
+      <button class="btn danger" data-act="delmatch" data-admin>경기 삭제</button></div>`;
 }
