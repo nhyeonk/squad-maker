@@ -1,5 +1,5 @@
 // 라인업 탭 화면
-import { S, P, lineup } from "../state.js";
+import { S, P, lineup, MIN_LINEUP_TEAMS, MAX_LINEUP_TEAMS } from "../state.js";
 import { FORMATIONS, FUTSAL_MAX } from "../formations.js";
 import { currentSlots, teamPlayers, poolList, locate } from "../lineup.js";
 import { TIERS, matchesPlayerName, playerTier } from "../players.js";
@@ -186,6 +186,10 @@ function teamsCard(l, t) {
   return `<div class="card">
     <h3>팀 명단</h3>
     <div class="row" data-edit><input class="in" data-chg="teamname" value="${esc(l.teams[t].name)}" placeholder="팀 이름" aria-label="현재 팀 이름"></div>
+    <div class="grid2" style="margin-top:8px" data-edit>
+      <button class="btn" data-act="addteam" ${l.teams.length >= MAX_LINEUP_TEAMS ? "disabled" : ""}>+ 팀 추가</button>
+      <button class="btn danger" data-act="delteam" ${l.teams.length <= MIN_LINEUP_TEAMS ? "disabled" : ""}>현재 팀 삭제</button>
+    </div>
     ${cards}
     <p class="hint" data-edit>선수를 누르고 <b>여기로 이동</b>을 누르거나, 다른 팀 선수를 눌러 서로 맞바꿀 수 있어요.</p>
   </div>`;

@@ -1,6 +1,6 @@
 // 버튼·입력 이벤트 처리
 // HTML의 data-act="이름" 버튼을 누르면 아래 actions["이름"]이 실행돼요. (data-v 값이 v로 들어와요)
-import { S, P, lineup, defaultLineup } from "./state.js";
+import { S, P, lineup, defaultLineup, addLineupTeam, MIN_LINEUP_TEAMS } from "./state.js";
 import { api, parseConfig, saveCfg, clearCfg, shareLink, login, logout, loginGoogle, setAdmins, loadLocal } from "./store.js";
 import { FORMATIONS } from "./formations.js";
 import { ensurePlayer, findByName, parseNames, playerTier, TIERS } from "./players.js";
@@ -28,7 +28,7 @@ const ADMIN_ONLY = new Set(["delmatch", "pdel", "bulkstart", "bulkdelete", "impo
 
 /* 보기 전용일 때 막을 동작 */
 const EDIT_ONLY = new Set([
-  "tobench", "toteam", "topool", "attend", "unattend", "split", "fill", "clearteam", "resetall",
+  "tobench", "toteam", "topool", "attend", "unattend", "split", "fill", "clearteam", "resetall", "addteam", "delteam",
   "autoplace", "startmatch", "newmatch", "goal", "delgoal", "mstatus", "delmatch", "mrmplayer", "maddplayer",
   "posopen", "posset", "posreset", "bulkstart", "bulkdelete", "lsave", "ppos", "pdetail", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply", "pregular", "attendregulars", "rostertoggle",
 ]);
@@ -140,6 +140,22 @@ const actions = {
     const T = lineup().teams[S.ui.team];
     T.slots = {};
     T.bench = [];
+    commitLineup();
+  },
+  addteam() {
+    const index = addLineupTeam(lineup().teams);
+    if (index < 0) return;
+    S.ui.team = index;
+    commitLineup();
+  },
+  delteam() {
+    const l = lineup();
+    const team = l.teams[S.ui.team];
+    if (l.teams.length <= MIN_LINEUP_TEAMS || !team) return;
+    if (!confirm(`${team.name}을(를) 삭제할까요? 선수는 대기 명단으로 가요.`)) return;
+    l.attendees = [...new Set([...l.attendees, ...teamPlayers(team)])];
+    l.teams.splice(S.ui.team, 1);
+    S.ui.team = Math.min(S.ui.team, l.teams.length - 1);
     commitLineup();
   },
   resetall() {

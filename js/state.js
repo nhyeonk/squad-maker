@@ -1,10 +1,14 @@
 // 앱 전체 상태 (한 곳에서 관리)
 import { uid } from "./utils.js";
 
-const DEFAULT_TEAMS = [
-  { c: "#e5484d", n: "A팀" },
-  { c: "#3e63dd", n: "B팀" },
+const TEAM_PRESETS = [
+  { color: "#e5484d", name: "A팀" },
+  { color: "#3e63dd", name: "B팀" },
+  { color: "#f59e0b", name: "C팀" },
+  { color: "#30a46c", name: "D팀" },
 ];
+export const MIN_LINEUP_TEAMS = 2;
+export const MAX_LINEUP_TEAMS = TEAM_PRESETS.length;
 
 /**
  * 데이터 구조
@@ -13,7 +17,7 @@ const DEFAULT_TEAMS = [
  *                    teams: [{ name, color, players: [id], roles: { [id]: "GK"|"DF"|"MF"|"FW"|"SUB" } } x2],
  *                    goals: [{ id, team: 0|1, scorer, assist, og, t }], createdAt, updatedAt } }
  * lineup:  { size, formation, referee, attendees: [id],
- *            teams: [{ id, name, color, slots: { [slotIndex]: playerId }, bench: [id] }] x2 }
+ *            teams: [{ id, name, color, slots: { [slotIndex]: playerId }, bench: [id] }] x2~4 }
  */
 export const S = {
   players: {},
@@ -34,24 +38,36 @@ export const S = {
 };
 
 function mkTeam(i) {
-  const t = DEFAULT_TEAMS[i];
-  return { id: uid(), name: t.n, color: t.c, slots: {}, bench: [] };
+  return { id: uid(), ...TEAM_PRESETS[i], slots: {}, bench: [] };
+}
+
+/** 삭제된 팀의 기본 이름과 색을 다시 쓸 수 있게 빈 자리를 찾아요. */
+export function addLineupTeam(teams) {
+  if (teams.length >= MAX_LINEUP_TEAMS) return -1;
+  const preset = TEAM_PRESETS.findIndex(({ color }) => !teams.some((team) => team.color === color));
+  const laterColors = TEAM_PRESETS.slice(preset + 1).map(({ color }) => color);
+  const nextTeam = teams.findIndex(({ color }) => laterColors.includes(color));
+  const index = nextTeam < 0 ? teams.length : nextTeam;
+  teams.splice(index, 0, mkTeam(preset));
+  return index;
 }
 
 export function defaultLineup() {
   return { size: 11, formation: "4-4-2", referee: "", attendees: [], teams: [mkTeam(0), mkTeam(1)] };
 }
 
-/** 예전에 만든 추가 팀의 선수는 오늘 참가자와 대기 명단에 남겨요. */
+/** 이전 버전에서 4팀을 초과한 팀의 선수는 대기 명단에 남겨요. */
 export function normalizeLineup(saved) {
   if (!saved) return defaultLineup();
-  if (saved.teams?.length === 2) return saved;
-  const [first, second, ...extra] = saved.teams || [];
+  const stored = Array.isArray(saved.teams) ? saved.teams.filter(Boolean) : [];
+  if (stored.length === saved.teams?.length && stored.length >= MIN_LINEUP_TEAMS && stored.length <= MAX_LINEUP_TEAMS) return saved;
+  const teams = stored.slice(0, MAX_LINEUP_TEAMS);
   const attendees = new Set(saved.attendees || []);
-  for (const team of extra) {
+  for (const team of stored.slice(MAX_LINEUP_TEAMS)) {
     for (const id of [...Object.values(team.slots || {}), ...(team.bench || [])]) attendees.add(id);
   }
-  return { ...saved, attendees: [...attendees], teams: [first || mkTeam(0), second || mkTeam(1)] };
+  while (teams.length < MIN_LINEUP_TEAMS) addLineupTeam(teams);
+  return { ...saved, attendees: [...attendees], teams };
 }
 
 /** 현재 라인업 (없으면 새로 만들어요) */
