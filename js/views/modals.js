@@ -9,7 +9,7 @@ import { defaultMatchTitle, recentPlaces, shortDate } from "../matches.js";
 import { getCfg, groupId } from "../store.js";
 import { GROUP_ID, APP_VERSION } from "../config.js";
 import { $, esc, fmtDate, todayStr } from "../utils.js";
-import { dot, playerName, prefList, tierBadge, tierSelect } from "./common.js";
+import { dot, playerName, prefList, skillDisplay, skillEditor, tierBadge, tierSelect } from "./common.js";
 
 export function openModal(html) {
   S.ui.settingsOpen = false;
@@ -65,6 +65,9 @@ export function openPlayer(pid) {
     <div class="sec ${ed ? "" : "ro-dim"}"><button class="btn block ${p.regular ? "pri" : "ghost"}" data-act="pregular" data-v="${pid}" ${dis}>${p.regular ? "⭐ 고정 참여 (눌러서 해제)" : "☆ 고정 참여로 지정"}</button></div>
     <div class="sec ${ed ? "" : "ro-dim"}"><label>선호 포지션 · 누른 순서가 우선순위예요 (다시 누르면 해제)</label><div class="posbtns">${posBtns}</div>${detailRow}${chosen}</div>
     <div class="sec"><label>티어</label>${ed ? tierSelect(p) : tierBadge(tier) || `<span class="tier-unset">미지정</span>`}</div>
+    <div class="sec"><label>평점</label>${ed
+      ? `<div class="skill-editor" data-player-skill="${esc(pid)}" role="group" aria-label="평점 조정">${skillEditor(p)}</div>`
+      : skillDisplay(p)}</div>
     <div class="sec"><label>기록</label>
       <div style="font-size:14px;font-weight:700">${s.apps || 0}경기 · ${s.goals || 0}골 · ${s.ast || 0}도움 · ${s.w || 0}승 ${s.d || 0}무 ${s.l || 0}패${s.laundry ? ` · 🧺 빨래 ${s.laundry}회` : ""}</div>${hist}</div>
     ${ed ? `<div class="row"><button class="btn pri" data-act="psave" data-v="${pid}" style="flex:1">이름 저장</button><button class="btn danger" data-act="pdel" data-v="${pid}" data-admin>선수 삭제</button></div>` : ""}`);

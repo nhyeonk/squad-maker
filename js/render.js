@@ -16,7 +16,7 @@ function renderChrome() {
   else [sync.className, sync.textContent] = ["sync ro", "● 실시간 · 보기 전용"];
 
   document.body.classList.toggle("ro", !S.canEdit); // 로그인 전: 입력 버튼 숨김
-  document.body.classList.toggle("notadmin", !S.isAdmin); // 관리자 아님: 삭제·별점 버튼 숨김
+  document.body.classList.toggle("notadmin", !S.isAdmin); // 관리자 전용 버튼 숨김
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.v === S.ui.tab));
 
   $("#banner").innerHTML =

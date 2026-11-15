@@ -42,6 +42,21 @@ async function remote(fn) {
   }
 }
 
+async function putPlayerField(id, field, value) {
+  const previous = S.players[id];
+  if (!previous) return false;
+  const patch = { [field]: value };
+  const next = { ...previous, ...patch };
+  S.players[id] = next;
+  bumpData();
+  const saved = FB ? await remote(() => FB.fs.updateDoc(ref("players", id), patch)) : saveLocal();
+  if (!saved && S.players[id] === next) {
+    S.players[id] = previous;
+    bumpData();
+  }
+  return saved;
+}
+
 export const api = {
   putPlayer(p) {
     bumpData();
@@ -49,19 +64,8 @@ export const api = {
     if (FB) return remote(() => FB.fs.setDoc(ref("players", p.id), plain(p)));
     saveLocal();
   },
-  async putPlayerTier(id, tier) {
-    const previous = S.players[id];
-    if (!previous) return false;
-    const next = { ...previous, tier };
-    S.players[id] = next;
-    bumpData();
-    const saved = FB ? await remote(() => FB.fs.updateDoc(ref("players", id), { tier })) : saveLocal();
-    if (!saved && S.players[id] === next) {
-      S.players[id] = previous;
-      bumpData();
-    }
-    return saved;
-  },
+  putPlayerTier: (id, tier) => putPlayerField(id, "tier", tier),
+  putPlayerSkill: (id, skill) => putPlayerField(id, "skill", skill),
   delPlayer(id) {
     bumpData();
     delete S.players[id];

@@ -3,7 +3,7 @@ import { S, P, pname, lineup } from "./state.js";
 import { api } from "./store.js";
 import { currentSlots, teamPlayers, poolList } from "./lineup.js";
 import { POS_COLOR } from "./formations.js";
-import { findByName, playerTier } from "./players.js";
+import { findByName, playerSkill, playerTier } from "./players.js";
 import { clone, download, fmtDate, todayStr, toast } from "./utils.js";
 
 /* ---------- 카톡용 명단 텍스트 ---------- */
@@ -285,6 +285,8 @@ export async function mergeData(d) {
       if (!(ex.pos || []).length && (p.pos || []).length) await api.putPlayer({ ...ex, pos: p.pos });
       const tier = playerTier(p);
       if (tier && !playerTier(S.players[ex.id])) await api.putPlayerTier(ex.id, tier);
+      const skill = playerSkill(p, null);
+      if (skill !== null && playerSkill(S.players[ex.id], null) === null) await api.putPlayerSkill(ex.id, skill);
     } else {
       idMap[p.id] = p.id;
       await api.putPlayer(p);

@@ -13,6 +13,12 @@ export const TIERS = {
 
 export const playerTier = (p) => typeof p?.tier === "string" && Object.hasOwn(TIERS, p.tier) ? p.tier : "";
 
+/** 별점을 정하지 않은 선수에게는 기존 기본값인 3.0을 보여줘요. */
+export function playerSkill(p, fallback = 3) {
+  const value = p?.skill;
+  return Number.isFinite(value) && value >= 0 && value <= 5 ? value : fallback;
+}
+
 /** 미지정 선수는 팀을 나눌 때 중간값인 B와 같은 비중으로 계산해요. */
 export const tierWeight = (p) => TIERS[playerTier(p) || "B"].weight;
 
