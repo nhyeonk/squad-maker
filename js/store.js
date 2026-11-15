@@ -1,6 +1,6 @@
 // 데이터 저장소: 로컬(localStorage) 또는 Firebase Firestore (실시간 공유)
 import { FIREBASE_CONFIG, GROUP_ID, FIREBASE_SDK_VERSION, STORAGE_KEY, CONFIG_KEY } from "./config.js";
-import { S, hooks, defaultLineup, bumpData } from "./state.js";
+import { S, hooks, normalizeLineup, bumpData } from "./state.js";
 import { toast } from "./utils.js";
 
 let FB = null; // { db, fs, au, auth, gid }
@@ -13,7 +13,7 @@ const plain = (o) => JSON.parse(JSON.stringify(o)); // Firestore는 undefined를
 export function loadLocal() {
   try {
     const d = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-    return { players: d.players || {}, matches: d.matches || {}, lineup: d.lineup || null };
+    return { players: d.players || {}, matches: d.matches || {}, lineup: d.lineup ? normalizeLineup(d.lineup) : null };
   } catch {
     return { players: {}, matches: {}, lineup: null };
   }
@@ -267,7 +267,7 @@ export async function initFirebase(cfg) {
   fs.onSnapshot(col("players"), (snap) => { S.players = toObj(snap); bumpData(); loadedOne(); hooks.scheduleRender(); }, onErr);
   fs.onSnapshot(col("matches"), (snap) => { S.matches = toObj(snap); bumpData(); loadedOne(); hooks.scheduleRender(); }, onErr);
   fs.onSnapshot(ref("meta", "lineup"), (d) => {
-    if (!d.metadata.hasPendingWrites && !lineupDirty) S.lineup = d.exists() ? d.data() : S.lineup || defaultLineup();
+    if (!d.metadata.hasPendingWrites && !lineupDirty) S.lineup = normalizeLineup(d.exists() ? d.data() : S.lineup);
     loadedOne();
     hooks.scheduleRender();
   }, onErr);

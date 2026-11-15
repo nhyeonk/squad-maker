@@ -2,7 +2,7 @@
 import { S } from "./state.js";
 import { api } from "./store.js";
 import { $ } from "./utils.js";
-import { viewLineup, viewSelbar } from "./views/lineup.js";
+import { filterLineupMembers, viewLineup, viewSelbar } from "./views/lineup.js";
 import { viewMatchList, viewMatch } from "./views/matches.js";
 import { viewPlayers } from "./views/players.js";
 import { openSettings } from "./views/modals.js";
@@ -39,8 +39,11 @@ export function render() {
     app.innerHTML = `<div class="card empty">기록을 불러오는 중…</div>`;
     return;
   }
-  if (S.ui.tab === "lineup") app.innerHTML = viewLineup();
-  else if (S.ui.tab === "matches") {
+  if (S.ui.tab === "lineup") {
+    app.innerHTML = viewLineup();
+    const search = app.querySelector("[data-lineup-member-search]");
+    if (search?.value) filterLineupMembers(search);
+  } else if (S.ui.tab === "matches") {
     const m = S.ui.matchId && S.matches[S.ui.matchId];
     app.innerHTML = m ? viewMatch(m) : viewMatchList();
   } else app.innerHTML = viewPlayers();

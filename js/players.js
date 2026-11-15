@@ -74,8 +74,19 @@ export function fit(pid, role, label) {
   return v;
 }
 
-/* ---------- 비슷한 이름 찾기 (사진 인식 오타 바로잡기) ---------- */
 const CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
+
+/** 이름 일부 또는 연속된 한글 초성으로 검색해요. */
+export function matchesPlayerName(name, query) {
+  const compact = (value) => value.normalize("NFC").toLowerCase().replace(/\s+/g, "");
+  const key = compact(query).replace(/[\u1100-\u1112]/g, (char) => CHO[char.charCodeAt(0) - 0x1100]);
+  const full = compact(name);
+  if (full.includes(key)) return true;
+  const initials = full.replace(/[가-힣]/g, (char) => CHO[Math.floor((char.charCodeAt(0) - 0xac00) / 588)]);
+  return initials.includes(key);
+}
+
+/* ---------- 비슷한 이름 찾기 (사진 인식 오타 바로잡기) ---------- */
 const JUNG = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ";
 const JONG = " ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ";
 
@@ -117,6 +128,7 @@ export function similarPlayer(name) {
     if (p.name.length !== name.length) continue; // 글자 수가 같은 이름끼리만
     const d = editDistance(a, jamo(p.name));
     if (d < bestD) [best, bestD] = [p, d];
+    else if (d === bestD) best = null;
   }
   // 자모 2개까지 틀린 건 같은 사람으로 봐요 (예: 방하능 ↔ 박하늘)
   return best && bestD <= Math.max(2, Math.floor(a.length * 0.25)) ? best : null;

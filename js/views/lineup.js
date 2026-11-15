@@ -2,7 +2,7 @@
 import { S, P, lineup } from "../state.js";
 import { FORMATIONS, FUTSAL_MAX } from "../formations.js";
 import { currentSlots, teamPlayers, poolList, locate } from "../lineup.js";
-import { TIERS, playerTier } from "../players.js";
+import { TIERS, matchesPlayerName, playerTier } from "../players.js";
 import { pitchPosition, PITCH_ZONES } from "../pitch-zones.js";
 import { esc } from "../utils.js";
 import { attendanceCounts, computeStats } from "../stats.js";
@@ -87,6 +87,7 @@ function side(l, T) {
 function attendeesCard(l) {
   const counts = attendanceCounts();
   const players = Object.values(S.players);
+  const query = S.ui.lineupMemberQuery || "";
   const attendeeIds = new Set(l.attendees.filter(P));
   const notHere = players.filter((p) => !attendeeIds.has(p.id));
   const regulars = notHere.filter((p) => p.regular).sort((a, b) => a.name.localeCompare(b.name, "ko"));
@@ -94,7 +95,7 @@ function attendeesCard(l) {
     .filter((p) => !p.regular)
     .sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0) || a.name.localeCompare(b.name, "ko"));
   const chip = (p) =>
-    `<button class="chip ghost" data-act="attend" data-v="${p.id}">+ ${playerName(p.id)}${counts[p.id] ? ` <span style="font-size:11px;color:var(--mute)">${counts[p.id]}</span>` : ""}</button>`;
+    `<button class="chip ghost" data-act="attend" data-v="${esc(p.id)}">+ ${playerName(p.id)}${counts[p.id] ? ` <span style="font-size:11px;color:var(--mute)">${counts[p.id]}</span>` : ""}</button>`;
   return `<section class="card lineup-setup">
     <h3>오늘 참가자 <span class="badge">${attendeeIds.size}명</span></h3>
     <form class="row" data-act="addnames"><input class="in" name="n" aria-label="참가자 이름" placeholder="이름 입력 (여러 명은 쉼표로)" autocomplete="off"><button class="btn ghost">추가</button></form>
@@ -104,13 +105,36 @@ function attendeesCard(l) {
     </div>
     <details class="others lineup-members" data-act-toggle="lineupMembersOpen" ${S.ui.lineupMembersOpen ? "open" : ""}>
       <summary>기존 선수에서 추가 <span>${notHere.length}명</span></summary>
+      ${notHere.length ? `<input class="in lineup-member-search" type="search" data-lineup-member-search aria-label="기존 선수 검색" aria-controls="lineup-member-results" aria-describedby="lineup-member-search-hint" placeholder="선수 검색" value="${esc(query)}" autocomplete="off">
+      <p class="hint" id="lineup-member-search-hint"${query.trim() ? " hidden" : ""}>초성으로도 검색할 수 있어요. 김민수 → <strong>ㄱㅁㅅ</strong></p>
+      <div id="lineup-member-results">
       ${regulars.length ? `<div class="lineup-member-group"><strong>고정 참여</strong><div class="chips">${regulars.map(chip).join("")}</div></div>` : ""}
       ${others.length ? `<div class="lineup-member-group"><strong>지난 참가자 · 많이 온 순</strong><div class="chips">${others.map(chip).join("")}</div></div>` : ""}
-      ${notHere.length ? "" : `<p class="hint">${players.length ? "등록된 선수는 모두 참가자에 들어 있어요." : "아직 등록된 선수가 없어요."}</p>`}
+      <p class="hint" data-lineup-no-results role="status" hidden>검색 결과가 없어요.</p></div>`
+      : `<p class="hint">${players.length ? "등록된 선수는 모두 참가자에 들어 있어요." : "아직 등록된 선수가 없어요."}</p>`}
       <button class="btn ghost sm" data-act="roster">고정 참여 명단 관리</button>
     </details>
     <button class="btn pri block lineup-split" data-act="split" ${attendeeIds.size ? "" : "disabled"}>⚖️ ${l.teams.length}팀 밸런스 나누기</button>
   </section>`;
+}
+
+/** 검색하는 동안 입력창을 유지하고 안내와 결과만 갱신해요. */
+export function filterLineupMembers(search) {
+  const panel = search.closest("details");
+  const query = search.value.trim();
+  panel.querySelector("#lineup-member-search-hint").hidden = Boolean(query);
+  const results = panel.querySelector("#lineup-member-results");
+  let hasMatch = false;
+  for (const group of results.querySelectorAll(".lineup-member-group")) {
+    let groupHasMatch = false;
+    for (const chip of group.querySelectorAll('[data-act="attend"]')) {
+      chip.hidden = !matchesPlayerName(P(chip.dataset.v)?.name || "", query);
+      groupHasMatch ||= !chip.hidden;
+    }
+    group.hidden = !groupHasMatch;
+    hasMatch ||= groupHasMatch;
+  }
+  results.querySelector("[data-lineup-no-results]").hidden = hasMatch;
 }
 
 function poolCard(l) {
@@ -161,11 +185,9 @@ function teamsCard(l, t) {
     .join("");
   return `<div class="card">
     <h3>팀 명단</h3>
-    <div class="row" data-edit><input class="in" data-chg="teamname" value="${esc(l.teams[t].name)}" placeholder="팀 이름"></div>
-    <div class="grid2" style="margin-top:8px" data-edit><button class="btn" data-act="addteam">+ 팀 추가</button>
-      <button class="btn danger" data-act="delteam" ${l.teams.length <= 2 ? "disabled" : ""}>이 팀 삭제</button></div>
+    <div class="row" data-edit><input class="in" data-chg="teamname" value="${esc(l.teams[t].name)}" placeholder="팀 이름" aria-label="현재 팀 이름"></div>
     ${cards}
-    <p class="hint" data-edit>팀을 나눈 뒤에도 선수를 누르고 <b>여기로 이동</b>을 누르거나, 다른 팀 선수를 눌러 서로 맞바꿀 수 있어요. 풋살 밀어내기는 팀을 3개 이상 만들어 보세요.</p>
+    <p class="hint" data-edit>선수를 누르고 <b>여기로 이동</b>을 누르거나, 다른 팀 선수를 눌러 서로 맞바꿀 수 있어요.</p>
   </div>`;
 }
 
@@ -178,7 +200,13 @@ export function viewLineup() {
   const dis = S.canEdit ? "" : "disabled";
 
   const tabs = l.teams
-    .map((x, i) => `<button class="${i === t ? "on" : ""}" data-act="team" data-v="${i}">${dot(x.color)}${esc(x.name)} <small>${Object.keys(x.slots).length}/${slots.length}</small></button>`)
+    .map((x, i) => {
+      const placed = Object.values(x.slots).filter(P).length;
+      const total = teamPlayers(x).filter(P).length;
+      return `<button class="${i === t ? "on" : ""}" data-act="team" data-v="${i}" aria-pressed="${i === t}">
+        <span class="teamtab-title">${dot(x.color)}<span class="team-card-name" title="${esc(x.name)}">${esc(x.name)}</span></span>
+        <small>배치 ${placed}/${slots.length} · 총 ${total}명</small></button>`;
+    })
     .join("");
   const sizes = Object.keys(FORMATIONS).map(Number);
 
