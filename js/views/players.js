@@ -67,7 +67,7 @@ export function viewPlayers() {
       const first = bulk ? `<span class="ck ${picked.has(s.id) ? "on" : ""}">${picked.has(s.id) ? "✓" : ""}</span>` : i + 1; // 지금 정렬 순서대로 1번부터
       const tier = S.canEdit && !bulk ? tierSelect(pl) : tierBadge(playerTier(pl)) || `<span class="tier-unset">미지정</span>`;
       return `<tr class="click ${bulk && picked.has(s.id) ? "picked" : ""}" data-act="${bulk ? "bulktoggle" : "info"}" data-v="${s.id}">
-        <td>${first}</td><td class="nm">${playerName(s.id)}</td>
+        <td>${first}</td><td class="player-col">${playerName(s.id)}</td>
         <td>${tier}</td>
         <td>${rp ? `<span class="pb ${rp}" style="font-size:11px;padding:2px 7px">${POS_KO[rp]}</span>` : "-"}</td>
         <td>${prefs || `<span style="color:var(--mute)">-</span>`}</td>
@@ -93,7 +93,7 @@ export function viewPlayers() {
       <button class="btn sm ghost" data-act="bulkcancel">취소</button>
       <button class="btn sm red" data-act="bulkdelete" ${picked.size ? "" : "disabled"}>${picked.size}명 삭제</button></div>` : ""}
     ${rows.length
-      ? `<div class="tbw"><table class="tb"><thead><tr><th>No</th><th>이름</th><th>티어</th><th>추천 포지션</th><th>선호</th><th>경기</th><th>승-무-패</th><th>승률</th><th>골</th><th>도움</th><th>공격P</th></tr></thead><tbody>${tr}</tbody></table></div>`
+      ? `<div class="tbw"><table class="tb"><thead><tr><th>No</th><th class="player-col" scope="col">이름</th><th>티어</th><th>추천 포지션</th><th>선호</th><th>경기</th><th>승-무-패</th><th>승률</th><th>골</th><th>도움</th><th>공격P</th></tr></thead><tbody>${tr}</tbody></table></div>`
       : `<div class="card empty">${filter === "all" ? "아직 선수가 없어요." : "이 티어에 해당하는 선수가 없어요."}</div>`}
     <p class="hint">${S.canEdit ? "티어 칸에서 선수의 티어를 바로 지정할 수 있어요. " : ""}이름을 누르면 선호 포지션과 경기별 기록을 볼 수 있어요. 승패는 '종료'된 경기만 계산해요.</p>`;
 }

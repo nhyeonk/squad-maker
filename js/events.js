@@ -1,6 +1,6 @@
 // 버튼·입력 이벤트 처리
 // HTML의 data-act="이름" 버튼을 누르면 아래 actions["이름"]이 실행돼요. (data-v 값이 v로 들어와요)
-import { S, P, lineup, defaultLineup, mkTeam } from "./state.js";
+import { S, P, lineup, defaultLineup } from "./state.js";
 import { api, parseConfig, saveCfg, clearCfg, shareLink, login, logout, loginGoogle, setAdmins, loadLocal } from "./store.js";
 import { FORMATIONS } from "./formations.js";
 import { ensurePlayer, findByName, parseNames, playerTier, TIERS } from "./players.js";
@@ -12,6 +12,7 @@ import { lineupText, saveCanvasImage, copyCanvasImage, exportBackup, importBacku
 import * as M from "./views/modals.js";
 import * as LD from "./views/laundry.js";
 import { tierBadge } from "./views/common.js";
+import { filterLineupMembers } from "./views/lineup.js";
 import { render, commitLineup } from "./render.js";
 import { bindDrag, clickSuppressed, dropSlot, pitchPoint } from "./drag.js";
 import { $, copyText, toast } from "./utils.js";
@@ -27,7 +28,7 @@ const ADMIN_ONLY = new Set(["delmatch", "pdel", "bulkstart", "bulkdelete", "impo
 
 /* 보기 전용일 때 막을 동작 */
 const EDIT_ONLY = new Set([
-  "tobench", "toteam", "topool", "attend", "unattend", "split", "fill", "clearteam", "resetall", "addteam", "delteam",
+  "tobench", "toteam", "topool", "attend", "unattend", "split", "fill", "clearteam", "resetall",
   "autoplace", "startmatch", "newmatch", "goal", "delgoal", "mstatus", "delmatch", "mrmplayer", "maddplayer",
   "posopen", "posset", "posreset", "bulkstart", "bulkdelete", "lsave", "ppos", "pdetail", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply", "pregular", "attendregulars", "rostertoggle",
 ]);
@@ -126,6 +127,7 @@ const actions = {
   split() {
     if (!balanceSplit()) return toast("참가자를 먼저 추가하세요");
     S.ui.lineupMembersOpen = false;
+    S.ui.lineupMemberQuery = "";
     commitLineup();
     if (matchMedia("(max-width:860px)").matches) $("#lineup-result")?.scrollIntoView({ block: "start" });
     toast(`티어와 포지션을 기준으로 ${lineup().teams.length}팀으로 나눴어요`);
@@ -145,21 +147,7 @@ const actions = {
     const { size, formation } = lineup();
     S.lineup = { ...defaultLineup(), size, formation };
     S.ui.team = 0;
-    commitLineup();
-  },
-  addteam() {
-    const l = lineup();
-    if (l.teams.length >= 6) return toast("팀은 6개까지예요");
-    l.teams.push(mkTeam(l.teams.length));
-    S.ui.team = l.teams.length - 1;
-    commitLineup();
-  },
-  delteam() {
-    const l = lineup();
-    if (l.teams.length <= 2) return;
-    if (!confirm(`${l.teams[S.ui.team].name}을(를) 삭제할까요? 선수는 대기 명단으로 가요.`)) return;
-    l.teams.splice(S.ui.team, 1);
-    S.ui.team = 0;
+    S.ui.lineupMemberQuery = "";
     commitLineup();
   },
   autoplace() {
@@ -717,8 +705,14 @@ export function bindEvents() {
     } else changes[k]?.(el);
   });
 
-  // 사진 인식 결과에서 이름 고치기 (다시 그리지 않고 그 자리에서 표시만 바꿔요)
+  // 이름 검색과 인식 결과 수정은 입력창 대신 결과만 갱신해요.
   document.addEventListener("input", (e) => {
+    const search = e.target.closest("[data-lineup-member-search]");
+    if (search) {
+      S.ui.lineupMemberQuery = search.value;
+      filterLineupMembers(search);
+      return;
+    }
     const oi = e.target.closest("[data-ocr-i]");
     if (!oi || !S.ui.ocr) return;
     const i = +oi.dataset.ocrI;
