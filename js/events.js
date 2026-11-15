@@ -3,7 +3,7 @@
 import { S, P, lineup, defaultLineup } from "./state.js";
 import { api, parseConfig, saveCfg, clearCfg, shareLink, login, logout, loginGoogle, setAdmins, loadLocal } from "./store.js";
 import { FORMATIONS } from "./formations.js";
-import { ensurePlayer, findByName, parseNames, playerSkill, playerTier, TIERS } from "./players.js";
+import { ensurePlayer, findByName, parseNames, playerTier, TIERS } from "./players.js";
 import { recognizeNames } from "./ocr.js";
 import { locate, removeFrom, movePlayer, autoPlace, relayoutAll, balanceSplit, fillEmpty, teamPlayers, poolList, currentSlots, setSlotLayout, resetSlotLayout } from "./lineup.js";
 import { roleOfLabel } from "./formations.js";
@@ -11,28 +11,11 @@ import { shortDate, createMatchFromLineup, createBlankMatch, addGoal, removeGoal
 import { lineupText, saveCanvasImage, copyCanvasImage, exportBackup, importBackup, mergeData } from "./share.js";
 import * as M from "./views/modals.js";
 import * as LD from "./views/laundry.js";
-import { skillEditor, tierBadge } from "./views/common.js";
+import { tierBadge } from "./views/common.js";
 import { filterLineupMembers } from "./views/lineup.js";
 import { render, commitLineup } from "./render.js";
 import { bindDrag, clickSuppressed, dropSlot, pitchPoint } from "./drag.js";
 import { $, copyText, toast } from "./utils.js";
-
-async function setSkill(pid, value) {
-  if (!P(pid) || !Number.isFinite(value)) return;
-  const skill = Math.max(0, Math.min(5, Math.round(value * 2) / 2));
-  const editor = $("#modal [data-player-skill]");
-  const refresh = () => {
-    if (editor?.isConnected && editor.dataset.playerSkill === pid && P(pid)) {
-      const focused = editor.contains(document.activeElement) ? document.activeElement.dataset.v : null;
-      editor.innerHTML = skillEditor(P(pid));
-      if (focused) [...editor.querySelectorAll("button")].find((button) => button.dataset.v === focused)?.focus();
-    }
-    render();
-  };
-  const saved = api.putPlayerSkill(pid, skill);
-  refresh();
-  if (!(await saved)) refresh();
-}
 
 /** 보기 전용일 때 왜 안 되는지 */
 function viewOnlyReason() {
@@ -47,7 +30,7 @@ const ADMIN_ONLY = new Set(["delmatch", "pdel", "bulkstart", "bulkdelete", "impo
 const EDIT_ONLY = new Set([
   "tobench", "toteam", "topool", "attend", "unattend", "split", "fill", "clearteam", "resetall",
   "autoplace", "startmatch", "newmatch", "goal", "delgoal", "mstatus", "delmatch", "mrmplayer", "maddplayer",
-  "posopen", "posset", "posreset", "bulkstart", "bulkdelete", "lsave", "ppos", "pdetail", "pstar", "pstep", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply", "pregular", "attendregulars", "rostertoggle",
+  "posopen", "posset", "posreset", "bulkstart", "bulkdelete", "lsave", "ppos", "pdetail", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply", "pregular", "attendregulars", "rostertoggle",
 ]);
 
 const actions = {
@@ -375,18 +358,6 @@ const actions = {
     l.attendees.push(...ids);
     commitLineup();
     toast(`고정 참여 ${ids.length}명 추가했어요`);
-  },
-  pstar(v) {
-    const [pid, star] = v.split(":");
-    const n = Number(star);
-    const current = playerSkill(P(pid));
-    // 같은 별을 다시 누르면 반 별, 한 별, 빈 별 순으로 바뀌어요.
-    if (current < n - 0.5) return setSkill(pid, n - 0.5);
-    return setSkill(pid, current === n ? n - 1 : n);
-  },
-  pstep(v) {
-    const [pid, step] = v.split(":");
-    return setSkill(pid, playerSkill(P(pid)) + Number(step));
   },
   async psave(v) {
     const n = $("#pnm").value.trim();

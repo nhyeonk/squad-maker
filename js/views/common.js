@@ -1,7 +1,7 @@
 // 여러 화면에서 쓰는 작은 조각들
 import { P, pname } from "../state.js";
 import { PREF_DETAIL, roleOfLabel } from "../formations.js";
-import { TIERS, playerSkill, playerTier } from "../players.js";
+import { TIERS, playerTier } from "../players.js";
 import { esc } from "../utils.js";
 
 export function tierBadge(tier) {
@@ -19,27 +19,6 @@ export function tierSelect(p) {
     <option value="" ${current ? "" : "selected"}>미지정</option>
     ${Object.keys(TIERS).map((tier) => `<option value="${tier}" ${tier === current ? "selected" : ""}>${tier} 티어</option>`).join("")}
   </select>`;
-}
-
-const STARS = [1, 2, 3, 4, 5];
-const starClass = (skill, star) => skill >= star ? "full" : skill >= star - 0.5 ? "half" : "";
-
-export function skillDisplay(p) {
-  const skill = playerSkill(p);
-  const stars = STARS.map((n) => `<span class="skill-star ${starClass(skill, n)}">★</span>`).join("");
-  return `<span class="skill-display"><span aria-hidden="true">${stars}</span><b>${skill.toFixed(1)}</b></span>`;
-}
-
-export function skillEditor(p) {
-  const skill = playerSkill(p);
-  const id = esc(p.id);
-  const stars = STARS.map((n) =>
-    `<button type="button" class="skill-star ${starClass(skill, n)}" data-act="pstar" data-v="${id}:${n}" aria-label="별 ${n}">★</button>`
-  ).join("");
-  return `<button type="button" class="skill-step" data-act="pstep" data-v="${id}:-0.5" aria-label="평점 0.5 내리기" ${skill <= 0 ? "disabled" : ""}>−</button>
-    ${stars}
-    <button type="button" class="skill-step" data-act="pstep" data-v="${id}:0.5" aria-label="평점 0.5 올리기" ${skill >= 5 ? "disabled" : ""}>+</button>
-    <b>${skill.toFixed(1)}</b>`;
 }
 
 /** 선수의 첫 번째 선호 포지션 배지 */

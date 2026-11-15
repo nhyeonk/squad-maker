@@ -221,19 +221,6 @@ input.lineup-member-search{margin-top:8px;font-size:16px}
 .tier-table-grid button[aria-pressed="true"]{background:#e3f2e8;border-color:var(--green);color:var(--green)}
 .tier-unset{font-size:12px;color:var(--sub)}
 select.in.tier-select{padding:7px 6px;min-height:34px;font-size:13px}
-.player-stat-controls{flex-wrap:wrap;margin-bottom:10px}
-.player-stat-controls .seg{flex-wrap:wrap;max-width:100%}
-.skill-display,.skill-editor{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
-.skill-display{font-size:13px}
-.skill-display b,.skill-editor b{color:var(--sub);font-variant-numeric:tabular-nums}
-.skill-star{color:#b8b0a3;line-height:1}
-.skill-star.full{color:#ad7000}
-.skill-star.half{color:transparent;background:linear-gradient(90deg,#ad7000 50%,#b8b0a3 50%);background-clip:text}
-.skill-editor{gap:4px;max-width:100%}
-.skill-editor button{border-radius:9px;min-width:32px;min-height:36px}
-.skill-editor .skill-star{font-size:26px}
-.skill-step{font-size:20px;font-weight:800;background:var(--soft)}
-.skill-step:disabled{opacity:.45}
 @media (max-width:580px){.tier-table-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 table.tb{width:100%;border-collapse:collapse;background:#fff;font-size:14px}
 .tbw{border:1px solid var(--line);border-radius:13px;overflow:auto;background:#fff}
