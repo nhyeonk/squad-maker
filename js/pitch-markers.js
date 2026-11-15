@@ -24,21 +24,16 @@ export function pitchMarkerInsets(slot) {
     right: Math.max(right, name?.right ?? right) - x + 2,
     top: y - Math.min(top, name?.top ?? top) + 2,
     bottom: Math.max(bottom, name?.bottom ?? bottom) - y + 2,
+    circleOffsetY: y - cy,
   };
 }
 
-export function positionPitchMarker(slot, point, { width, height }, pad, preset = false) {
-  const top = topLeft.y * height / 100;
-  const bottom = bottomLeft.y * height / 100;
-  const minY = top + pad.top;
-  const maxY = bottom - pad.bottom;
-  const rawY = point.y * height / 100;
-  // 기본 포메이션은 줄 간격을 유지하고, 직접 옮긴 자리는 선을 넘을 때만 보정해요.
-  const y = preset && minY <= maxY
-    ? minY + (maxY - minY) * clamp((rawY - top) / (bottom - top), 0, 1)
-    : clamp(rawY, minY, maxY);
+export function positionPitchMarker(slot, point, { width, height }, pad, goalkeeper = false) {
+  const top = goalkeeper ? 0 : topLeft.y * height / 100;
+  const bottom = goalkeeper ? height : bottomLeft.y * height / 100;
+  const y = clamp(point.y * height / 100, top + pad.top, bottom - pad.bottom);
   const ratio = clamp((y - pad.top - top) / (bottom - top), 0, 1);
-  const edge = (topLeft.x + (bottomLeft.x - topLeft.x) * ratio) * width / 100;
+  const edge = goalkeeper ? 0 : (topLeft.x + (bottomLeft.x - topLeft.x) * ratio) * width / 100;
   const x = clamp(point.x * width / 100, edge + pad.left, width - edge - pad.right);
   const fitted = { x: x / width * 100, y: y / height * 100 };
   slot.style.setProperty("--slot-display-x", `${fitted.x}%`);
@@ -49,12 +44,16 @@ export function positionPitchMarker(slot, point, { width, height }, pad, preset 
 function fitPitchMarkers(pitch) {
   const size = pitch.getBoundingClientRect();
   if (!size.width || !size.height) return;
-  const markers = [...pitch.querySelectorAll('.slot:not([data-drag="0"]):not(.dragging)')];
+  const markers = [...pitch.querySelectorAll(".slot:not(.dragging)")];
   const insets = markers.map(pitchMarkerInsets);
-  markers.forEach((slot, i) => positionPitchMarker(slot, {
-    x: parseFloat(slot.style.getPropertyValue("--slot-x")),
-    y: parseFloat(slot.style.getPropertyValue("--slot-y")),
-  }, size, insets[i], !slot.hasAttribute("data-moved")));
+  markers.forEach((slot, i) => {
+    const x = parseFloat(slot.style.getPropertyValue("--slot-x"));
+    const y = parseFloat(slot.style.getPropertyValue("--slot-y"));
+    const pad = insets[i];
+    // 기본 좌표에는 이름표를 제외한 동그라미의 중심을 맞춰요.
+    const offset = slot.hasAttribute("data-moved") ? 0 : pad.circleOffsetY / size.height * 100;
+    positionPitchMarker(slot, { x, y: y + offset }, size, pad, slot.dataset.drag === "0");
+  });
 }
 
 const observer = typeof ResizeObserver === "function"

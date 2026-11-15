@@ -1,5 +1,5 @@
 // 인원별 포메이션과 경기장 위 자리 좌표
-import { pitchPosition, pitchZoneCenter } from "./pitch-zones.js";
+import { pitchZoneCenter } from "./pitch-zones.js";
 
 /** 인원(골키퍼 포함) → 고를 수 있는 포메이션 (필드 플레이어 라인, 뒤에서 앞으로) */
 export const FORMATIONS = {
@@ -47,20 +47,14 @@ const ROLE_OF = {};
 for (const [role, list] of Object.entries(POSITION_GROUPS)) list.forEach((l) => (ROLE_OF[l] = role));
 export const roleOfLabel = (label) => ROLE_OF[String(label).toUpperCase()] || "MF";
 
-// 공식 11인 포메이션에서 표시하는 포지션과 좌표. 저장된 슬롯 순서(뒤에서 앞으로, 왼쪽에서 오른쪽)는 유지해요.
-const FC_PRESETS = {
-  "4-4-2": [["LB",10,85],["LCB",35,88],["RCB",65,88],["RB",90,85],
-    ["LM",13,35],["LCM",35,43],["RCM",65,43],["RM",88,35],["LS",34,0],["RS",65,0]],
-  "4-3-3": [["LB",6,85],["LCB",32,88],["RCB",69,88],["RB",94,85],
-    ["LCM",27,53],["CM",50,58],["RCM",73,53],["LW",22,4],["ST",50,0],["RW",78,4]],
-  "4-2-3-1": [["LB",5,88],["LCB",32,100],["RCB",68,100],["RB",95,88],
-    ["LDM",34,72],["RDM",66,72],["LAM",22,32],["CAM",50,36],["RAM",78,32],["ST",50,0]],
-  "4-1-4-1": [["LB",9,88],["LCB",36,90],["RCB",63,90],["RB",91,88],["CDM",50,65],
-    ["LM",9,37],["LCM",36,47],["RCM",64,47],["RM",91,37],["ST",50,6]],
-  "5-3-2": [["LWB",12,71],["LCB",28,93],["CB",50,90],["RCB",72,93],["RWB",88,71],
-    ["LCM",29,50],["CM",50,52],["RCM",71,50],["LS",37,10],["RS",63,10]],
-  "3-4-3": [["LB",26,100],["CB",50,86],["RB",75,100],
-    ["LM",12,40],["LCM",38,43],["RCM",63,43],["RM",88,40],["LW",10,6],["ST",50,6],["RW",90,6]],
+// 11인 포메이션은 저장된 슬롯 순서(뒤에서 앞으로, 왼쪽에서 오른쪽)를 유지해요.
+const FORMATION_POSITIONS = {
+  "4-4-2": ["LB", "LCB", "RCB", "RB", "LM", "LCM", "RCM", "RM", "LS", "RS"],
+  "4-3-3": ["LB", "LCB", "RCB", "RB", "LCM", "CM", "RCM", "LW", "ST", "RW"],
+  "4-2-3-1": ["LB", "LCB", "RCB", "RB", "LDM", "RDM", "LAM", "CAM", "RAM", "ST"],
+  "4-1-4-1": ["LB", "LCB", "RCB", "RB", "CDM", "LM", "LCM", "RCM", "RM", "ST"],
+  "5-3-2": ["LWB", "LCB", "CB", "RCB", "RWB", "LCM", "CM", "RCM", "LS", "RS"],
+  "3-4-3": ["LB", "CB", "RB", "LM", "LCM", "RCM", "RM", "LW", "ST", "RW"],
 };
 
 /**
@@ -68,9 +62,9 @@ const FC_PRESETS = {
  * @returns {{role:"GK"|"DF"|"MF"|"FW", label:string, x:number, y:number}[]}
  */
 export function formationSlots(size, formation) {
-  const slots = [{ role: "GK", label: "GK", ...pitchPosition(50, 115) }];
-  const preset = size === 11 ? FC_PRESETS[formation] : null;
-  if (preset) return slots.concat(preset.map(([label, x, y]) => ({ role: roleOfLabel(label), label, ...pitchPosition(x, y) })));
+  const slots = [{ role: "GK", label: "GK", ...pitchZoneCenter("GK") }];
+  const preset = size === 11 ? FORMATION_POSITIONS[formation] : null;
+  if (preset) return slots.concat(preset.map((label) => ({ role: roleOfLabel(label), label, ...pitchZoneCenter(label) })));
   const lines = formation.split("-").map(Number);
   const L = lines.length;
 
