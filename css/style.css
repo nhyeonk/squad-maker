@@ -176,7 +176,7 @@ input.lineup-member-search{margin-top:8px;font-size:16px}
 .tcard.drop{border:2px dashed #e0a800;background:#fffbea}
 .tcard .th{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;font-weight:800;margin-bottom:8px}
 .team-card-title,.team-card-actions{display:flex;align-items:center;gap:6px;min-width:0}
-.team-card-title{flex:1 1 8rem}
+.team-card-title{flex:1 1 8rem;text-align:left}
 .team-card-title .badge{flex:none;white-space:nowrap}
 .team-card-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .team-card-actions{margin-left:auto;flex-wrap:wrap;justify-content:flex-end}

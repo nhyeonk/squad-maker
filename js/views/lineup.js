@@ -164,7 +164,7 @@ function teamsCard(l, t) {
       const canDrop = sel && selLoc && !(selLoc.kind !== "pool" && selLoc.team === i);
       const action = canDrop
         ? `<button class="btn sm pri" data-act="toteam" data-v="${i}">여기로 이동</button>`
-        : active ? "" : `<button class="btn sm ghost" data-act="team" data-v="${i}">보기 →</button>`;
+        : "";
       const status = active ? `<span class="team-viewing">보는 중</span>` : "";
       const chips = ids.length
         ? ids
@@ -175,10 +175,10 @@ function teamsCard(l, t) {
             })
             .join("")
         : `<span class="hint" style="margin:0">아직 배치된 선수가 없어요.</span>`;
-      return `<div class="tcard ${active ? "on" : ""} ${canDrop ? "drop" : ""}" data-drop="team:${i}">
+      return `<div class="tcard ${active ? "on" : ""} ${canDrop ? "drop" : ""}" data-drop="team:${i}" data-act="team" data-v="${i}">
         <div class="th">
-          <div class="team-card-title">${dot(x.color)}<span class="team-card-name" title="${esc(x.name)}">${esc(x.name)}</span><span class="badge">${ids.length}명</span></div>
-          <div class="team-card-actions">${status}${action}</div>
+          <button type="button" class="team-card-title" aria-label="${esc(x.name)} 보기" aria-pressed="${active}">${dot(x.color)}<span class="team-card-name" title="${esc(x.name)}">${esc(x.name)}</span><span class="badge">${ids.length}명</span></button>
+          ${status || action ? `<div class="team-card-actions">${status}${action}</div>` : ""}
         </div>
         <div class="chips">${chips}</div></div>`;
     })
