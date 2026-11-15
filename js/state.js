@@ -25,6 +25,7 @@ export const S = {
   lineup: null,
   ui: {
     tab: "lineup", team: 0, sel: null, matchId: null, sort: "goals", period: "all", tierFilter: "all",
+    matchYear: null, matchMonth: null,
     badge: (() => { try { return localStorage.getItem("squadmaker_badge") || "apps"; } catch { return "apps"; } })(),
   },
   mode: "local", // "local" | "remote"

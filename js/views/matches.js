@@ -1,7 +1,7 @@
 // 경기 기록 탭 화면 (목록 + 상세)
 import { S, pname } from "../state.js";
 import { scoreOf } from "../stats.js";
-import { esc, fmtDate } from "../utils.js";
+import { esc, fmtDate, todayStr } from "../utils.js";
 import { dot, playerName } from "./common.js";
 
 const statusChip = (m) => `<span class="status ${m.status === "done" ? "done" : ""}">${m.status === "done" ? "종료" : "진행 중"}</span>`;
@@ -20,9 +20,27 @@ function scorersText(m, ti) {
 }
 
 export function viewMatchList() {
-  const ms = Object.values(S.matches).sort(
-    (a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt || 0) - (a.createdAt || 0)
+  const all = Object.values(S.matches);
+  const [currentYear, currentMonth] = todayStr().split("-");
+  const year = S.ui.matchYear ?? currentYear;
+  const month = S.ui.matchMonth ?? currentMonth;
+  const years = new Set([currentYear]);
+  if (year) years.add(year);
+  for (const m of all) {
+    const matchYear = /^(\d{4})-\d{2}-\d{2}$/.exec(m.date)?.[1];
+    if (matchYear) years.add(matchYear);
+  }
+  const prefix = month ? `${year}-${month}-` : `${year}-`;
+  const ms = all.filter((m) => !year || String(m.date ?? "").startsWith(prefix)).sort(
+    (a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")) || (b.createdAt || 0) - (a.createdAt || 0)
   );
+  const yearOptions = [...years].sort().reverse().map((y) =>
+    `<option value="${y}" ${y === year ? "selected" : ""}>${y}년</option>`
+  ).join("");
+  const monthOptions = Array.from({ length: 12 }, (_, i) => {
+    const value = String(i + 1).padStart(2, "0");
+    return `<option value="${value}" ${year && value === month ? "selected" : ""}>${i + 1}월</option>`;
+  }).join("");
   const cards = ms
     .map((m) => {
       const sc = scoreOf(m);
@@ -37,7 +55,15 @@ export function viewMatchList() {
     .join("");
   return `<div class="row" style="margin-bottom:12px"><h3 style="margin:0;flex:1;display:flex;gap:7px;align-items:center">경기 기록 <span class="badge">${ms.length}경기</span></h3>
       <button class="btn pri sm" data-act="newmatch" data-edit>+ 새 경기</button></div>
-    ${ms.length ? `<div class="mlist">${cards}</div>` : `<div class="card empty">아직 경기가 없어요. 라인업 탭에서 팀을 짠 뒤 <b>경기 기록 시작</b>을 누르세요.</div>`}`;
+    <div class="ctrls" role="group" aria-label="경기 기록 기간">
+      <label class="lb" for="match-year">연도</label><select class="in" id="match-year" data-chg="matchYear">
+        <option value="" ${!year ? "selected" : ""}>전체 연도</option>${yearOptions}</select>
+      <label class="lb" for="match-month">월</label><select class="in" id="match-month" data-chg="matchMonth" ${!year ? "disabled" : ""}>
+        <option value="" ${!year || !month ? "selected" : ""}>전체 월</option>${monthOptions}</select>
+    </div>
+    ${ms.length ? `<div class="mlist">${cards}</div>` : `<div class="card empty">${all.length
+      ? "선택한 기간에 경기 기록이 없어요."
+      : "아직 경기가 없어요. 라인업 탭에서 팀을 짠 뒤 <b>경기 기록 시작</b>을 누르세요."}</div>`}`;
 }
 
 export function viewMatch(m) {

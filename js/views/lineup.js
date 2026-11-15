@@ -103,8 +103,9 @@ function attendeesCard(l) {
       <button class="btn kakao sm" data-act="ocr">📷 카톡 투표 캡처</button>
       ${regulars.length ? `<button class="btn ghost sm" data-act="attendregulars">⭐ 고정 ${regulars.length}명 추가</button>` : ""}
     </div>
-    <details class="others lineup-members" data-act-toggle="lineupMembersOpen" ${S.ui.lineupMembersOpen ? "open" : ""}>
-      <summary>기존 선수에서 추가 <span>${notHere.length}명</span></summary>
+    <details class="lineup-members" data-act-toggle="lineupMembersOpen" ${S.ui.lineupMembersOpen ? "open" : ""}>
+      <summary class="lineup-member-toggle">기존 선수에서 추가 <span class="badge">${notHere.length}명</span></summary>
+      <div class="lineup-member-body">
       ${notHere.length ? `<input class="in lineup-member-search" type="search" data-lineup-member-search aria-label="기존 선수 검색" aria-controls="lineup-member-results" aria-describedby="lineup-member-search-hint" placeholder="선수 검색" value="${esc(query)}" autocomplete="off">
       <p class="hint" id="lineup-member-search-hint"${query.trim() ? " hidden" : ""}>초성으로도 검색할 수 있어요. 김민수 → <strong>ㄱㅁㅅ</strong></p>
       <div id="lineup-member-results">
@@ -112,7 +113,7 @@ function attendeesCard(l) {
       ${others.length ? `<div class="lineup-member-group"><strong>지난 참가자 · 많이 온 순</strong><div class="chips">${others.map(chip).join("")}</div></div>` : ""}
       <p class="hint" data-lineup-no-results role="status" hidden>검색 결과가 없어요.</p></div>`
       : `<p class="hint">${players.length ? "등록된 선수는 모두 참가자에 들어 있어요." : "아직 등록된 선수가 없어요."}</p>`}
-      <button class="btn ghost sm" data-act="roster">고정 참여 명단 관리</button>
+      <button class="btn ghost sm" data-act="roster">고정 참여 명단 관리</button></div>
     </details>
     <button class="btn pri block lineup-split" data-act="split" ${attendeeIds.size ? "" : "disabled"}>⚖️ ${l.teams.length}팀 밸런스 나누기</button>
   </section>`;
