@@ -6,6 +6,7 @@ import { filterLineupMembers, viewLineup, viewSelbar } from "./views/lineup.js";
 import { viewMatchList, viewMatch } from "./views/matches.js";
 import { viewPlayers } from "./views/players.js";
 import { openSettings } from "./views/modals.js";
+import { layoutPitchMarkers } from "./pitch-markers.js";
 
 function renderChrome() {
   const sync = $("#sync");
@@ -37,6 +38,7 @@ export function render() {
   const app = $("#app");
   if (S.mode === "remote" && !S.ready) {
     app.innerHTML = `<div class="card empty">기록을 불러오는 중…</div>`;
+    layoutPitchMarkers(null);
     return;
   }
   if (S.ui.tab === "lineup") {
@@ -47,6 +49,7 @@ export function render() {
     const m = S.ui.matchId && S.matches[S.ui.matchId];
     app.innerHTML = m ? viewMatch(m) : viewMatchList();
   } else app.innerHTML = viewPlayers();
+  layoutPitchMarkers(app.querySelector("#pitch"));
   $("#selbar").innerHTML = viewSelbar();
   // 로그인·권한이 바뀌면 열려 있는 설정 창도 새로 그려요
   if (S.ui.settingsOpen && !document.activeElement?.closest?.("#modal input")) openSettings();

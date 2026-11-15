@@ -3,7 +3,7 @@ import { S, P, lineup, MIN_LINEUP_TEAMS, MAX_LINEUP_TEAMS } from "../state.js";
 import { FORMATIONS, FUTSAL_MAX } from "../formations.js";
 import { currentSlots, teamPlayers, poolList, locate } from "../lineup.js";
 import { TIERS, matchesPlayerName, playerTier } from "../players.js";
-import { pitchPosition, PITCH_ZONES } from "../pitch-zones.js";
+import { pitchPosition, PITCH_TOUCHLINE, PITCH_ZONES } from "../pitch-zones.js";
 import { esc } from "../utils.js";
 import { attendanceCounts, computeStats } from "../stats.js";
 import { posBadge, dot, playerName } from "./common.js";
@@ -30,7 +30,7 @@ function pitchLines(futsal) {
       <rect class="pitch-grass-a" width="100" height="7"/><rect class="pitch-grass-b" y="7" width="100" height="7"/>
     </pattern></defs>
     <polygon points="${points([[0, 0], [100, 0], [100, 100], [0, 100]])}" fill="url(#pitch-grass)"/>
-    ${line([[4, 2], [96, 2], [96, 98], [4, 98], [4, 2]])}${line([[4, 50], [96, 50]])}
+    ${line(PITCH_TOUCHLINE)}${line([[4, 50], [96, 50]])}
     ${line(arc(50, 50, 13, 9, 0, Math.PI * 2))}${areas}
     <ellipse class="pitch-spot" cx="${center.x}" cy="${center.y}" rx=".5" ry=".35"/>
     <polygon class="pitch-goalkeeper-area" points="${PITCH_ZONES.GK.points}"/>
@@ -59,7 +59,7 @@ function pitch(l, T, slots) {
       const p = pid && P(pid);
       const n = p ? badgeValue(st, pid) : 0;
       return `<button class="slot ${p ? "filled" : ""} ${p && isSel(pid) ? "sel" : ""} ${sel && !p ? "target" : ""}"
-        style="--slot-x:${s.x}%;--slot-y:${s.y}%;--tc:${T.color}" data-act="slot" data-v="${i}" data-drag="${i}">
+        style="--slot-x:${s.x}%;--slot-y:${s.y}%;--tc:${T.color}" data-act="slot" data-v="${i}" data-drag="${i}" ${s.moved ? "data-moved" : ""}>
         <span class="cir role-${s.role}">${p ? `<span class="rl">${esc(s.label)}</span>${n ? `<span class="nb">${n}</span>` : ""}` : esc(s.label)}</span>
         ${p ? `<span class="nm">${playerName(pid)}</span>` : ""}</button>`;
     })

@@ -132,8 +132,8 @@ input.lineup-member-search{font-size:16px}
 /* 경기장 위 선수 (포지션 색 동그라미 + 숫자 배지 + 팀 색 이름표) */
 .slot{--slot-width:80px;--slot-side-gap:calc(var(--slot-width) / 2 + 5px);--slot-top-gap:50px;--slot-bottom-gap:36px;
   position:absolute;
-  left:clamp(min(50%,var(--slot-side-gap)),var(--slot-x),max(50%,calc(100% - var(--slot-side-gap))));
-  top:clamp(min(50%,var(--slot-top-gap)),var(--slot-y),max(50%,calc(100% - var(--slot-bottom-gap))));
+  left:var(--slot-display-x,clamp(min(50%,var(--slot-side-gap)),var(--slot-x),max(50%,calc(100% - var(--slot-side-gap)))));
+  top:var(--slot-display-y,clamp(min(50%,var(--slot-top-gap)),var(--slot-y),max(50%,calc(100% - var(--slot-bottom-gap)))));
   transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:4px;width:var(--slot-width);z-index:3;
   touch-action:none;user-select:none;-webkit-user-select:none}
 .pitch .slot{cursor:grab}

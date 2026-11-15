@@ -5,6 +5,7 @@ import { S, P, lineup } from "./state.js";
 import { movePlayer, currentSlots, setSlotLayout } from "./lineup.js";
 import { roleOfLabel } from "./formations.js";
 import { clampFieldPosition, pitchDistance, pitchZoneAt, PITCH_ZONES } from "./pitch-zones.js";
+import { pitchMarkerInsets, positionPitchMarker } from "./pitch-markers.js";
 import { render, commitLineup } from "./render.js";
 
 /* ---------- 경기장: 끌어서 옮기기 / 빈 잔디 눌러서 옮기기 ---------- */
@@ -16,11 +17,18 @@ export function pitchPoint(e, offset, r = document.getElementById("pitch").getBo
   };
 }
 
-function pitchDropAt(point, { skip = -1, previous, goalkeeper = false, fallback = false } = {}) {
+function pitchDropAt(point, { skip = -1, previous, goalkeeper = false, fallback = false, targetPoint = point } = {}) {
   const t = S.ui.team;
   const slots = currentSlots(t);
   const T = lineup().teams[t];
-  const targets = slots.map((slot, i) => ({ i, slot, distance: pitchDistance(slot, point) }))
+  const markers = document.querySelectorAll("#pitch [data-drag]");
+  const targets = slots.map((slot, i) => {
+    const style = markers[i]?.style;
+    const x = parseFloat(style?.getPropertyValue("--slot-display-x"));
+    const y = parseFloat(style?.getPropertyValue("--slot-display-y"));
+    const position = Number.isFinite(x) && Number.isFinite(y) ? { x, y } : slot;
+    return { i, slot, distance: pitchDistance(position, targetPoint) };
+  })
     .filter(({ i }) => i !== skip && (i !== 0 || goalkeeper))
     .sort((a, b) => a.distance - b.distance);
   const occupied = new Set(targets.map(({ slot }) => slot.label));
@@ -50,11 +58,11 @@ function savePitchPosition(team, slot, point, label) {
 }
 
 /** 자리를 옮기거나, 가리킨 포지션의 선수와 맞교환해요. */
-export function dropSlot(slotIdx, pt, previous) {
+export function dropSlot(slotIdx, pt, previous, targetPoint) {
   if (slotIdx === 0) return; // GK 자리는 고정, 선수 교체는 슬롯 선택으로 가능
   const t = S.ui.team;
   const point = clampFieldPosition(pt);
-  const target = pitchDropAt(point, { skip: slotIdx, previous, fallback: true });
+  const target = pitchDropAt(point, { skip: slotIdx, previous, fallback: true, targetPoint });
   const near = target.slotIdx;
   const T = lineup().teams[t];
   if (near >= 0) {
@@ -116,8 +124,8 @@ function bindPitchDrag() {
       x: (e.clientX - (box.left + box.width / 2)) / pitchRect.width * 100,
       y: (e.clientY - (box.top + box.height / 2)) / pitchRect.height * 100,
     };
-    drag = { el, idx, pid, sx: e.clientX, sy: e.clientY, moving: false, id: e.pointerId,
-      ox: el.style.getPropertyValue("--slot-x"), oy: el.style.getPropertyValue("--slot-y"), offset, previous: slot.label };
+    drag = { el, idx, pid, sx: e.clientX, sy: e.clientY, moving: false, id: e.pointerId, offset, previous: slot.label,
+      insets: pitchMarkerInsets(el), ox: el.style.getPropertyValue("--slot-display-x"), oy: el.style.getPropertyValue("--slot-display-y") };
   });
   document.addEventListener("pointermove", (e) => {
     if (!drag || e.pointerId !== drag.id) return;
@@ -139,9 +147,8 @@ function bindPitchDrag() {
       drag.el.classList.remove("faded");
       markDropOver(null);
       const pt = pitchPoint(e, drag.offset, r);
-      drag.el.style.setProperty("--slot-x", pt.x + "%");
-      drag.el.style.setProperty("--slot-y", pt.y + "%");
-      const target = pitchDropAt(pt, { skip: drag.idx, previous: drag.previous });
+      const targetPoint = positionPitchMarker(drag.el, pt, r, drag.insets);
+      const target = pitchDropAt(pt, { skip: drag.idx, previous: drag.previous, targetPoint });
       drag.previous = target.label;
       showPitchZone(target.zone);
       const circle = drag.el.querySelector(".cir");
@@ -158,8 +165,8 @@ function bindPitchDrag() {
         drag.ghost.className = "dragghost";
         drag.ghost.textContent = P(drag.pid)?.name || "";
         document.body.appendChild(drag.ghost);
-        drag.el.style.setProperty("--slot-x", drag.ox);
-        drag.el.style.setProperty("--slot-y", drag.oy);
+        drag.el.style.setProperty("--slot-display-x", drag.ox);
+        drag.el.style.setProperty("--slot-display-y", drag.oy);
         drag.el.classList.add("faded");
       }
       drag.ghost.style.left = e.clientX + "px";
@@ -183,7 +190,10 @@ function bindPitchDrag() {
       if (dropOutside(d.pid, under)) return commitLineup();
       return render(); // 놓을 곳이 아니면 제자리로
     }
-    dropSlot(d.idx, pitchPoint(e, d.offset), d.previous);
+    const r = document.getElementById("pitch").getBoundingClientRect();
+    const point = pitchPoint(e, d.offset, r);
+    const targetPoint = positionPitchMarker(d.el, point, r, d.insets);
+    dropSlot(d.idx, point, d.previous, targetPoint);
   };
   document.addEventListener("pointerup", end);
   document.addEventListener("pointercancel", (e) => {

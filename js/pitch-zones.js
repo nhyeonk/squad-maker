@@ -23,6 +23,7 @@ function toBoard({ x, y }) {
 }
 
 export const pitchPosition = (x, y) => toPercent(project(x, y));
+export const PITCH_TOUCHLINE = [[4, 2], [96, 2], [96, 98], [4, 98], [4, 2]];
 export function clampFieldPosition(point) {
   const fieldY = Math.max(0, Math.min(100, toBoard(point).y / FIELD_HEIGHT * 100));
   const left = pitchPosition(5, fieldY);
