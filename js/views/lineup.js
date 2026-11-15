@@ -87,6 +87,7 @@ function side(l, T) {
 function attendeesCard(l) {
   const counts = attendanceCounts();
   const players = Object.values(S.players);
+  const query = S.ui.lineupMemberQuery || "";
   const attendeeIds = new Set(l.attendees.filter(P));
   const notHere = players.filter((p) => !attendeeIds.has(p.id));
   const regulars = notHere.filter((p) => p.regular).sort((a, b) => a.name.localeCompare(b.name, "ko"));
@@ -104,7 +105,8 @@ function attendeesCard(l) {
     </div>
     <details class="others lineup-members" data-act-toggle="lineupMembersOpen" ${S.ui.lineupMembersOpen ? "open" : ""}>
       <summary>기존 선수에서 추가 <span>${notHere.length}명</span></summary>
-      ${notHere.length ? `<input class="in lineup-member-search" type="search" data-lineup-member-search aria-label="기존 선수 검색" aria-controls="lineup-member-results" placeholder="이름 또는 초성 검색 (예: ㄱㅁㅅ)" value="${esc(S.ui.lineupMemberQuery)}" autocomplete="off">
+      ${notHere.length ? `<input class="in lineup-member-search" type="search" data-lineup-member-search aria-label="기존 선수 검색" aria-controls="lineup-member-results" aria-describedby="lineup-member-search-hint" placeholder="선수 검색" value="${esc(query)}" autocomplete="off">
+      <p class="hint" id="lineup-member-search-hint"${query.trim() ? " hidden" : ""}>초성으로도 검색할 수 있어요. 김민수 → <strong>ㄱㅁㅅ</strong></p>
       <div id="lineup-member-results">
       ${regulars.length ? `<div class="lineup-member-group"><strong>고정 참여</strong><div class="chips">${regulars.map(chip).join("")}</div></div>` : ""}
       ${others.length ? `<div class="lineup-member-group"><strong>지난 참가자 · 많이 온 순</strong><div class="chips">${others.map(chip).join("")}</div></div>` : ""}
@@ -116,14 +118,17 @@ function attendeesCard(l) {
   </section>`;
 }
 
-/** 검색하는 동안 입력창을 유지하고 결과 칩만 바꿔요. */
+/** 검색하는 동안 입력창을 유지하고 안내와 결과만 갱신해요. */
 export function filterLineupMembers(search) {
-  const results = search.closest("details").querySelector("#lineup-member-results");
+  const panel = search.closest("details");
+  const query = search.value.trim();
+  panel.querySelector("#lineup-member-search-hint").hidden = Boolean(query);
+  const results = panel.querySelector("#lineup-member-results");
   let hasMatch = false;
   for (const group of results.querySelectorAll(".lineup-member-group")) {
     let groupHasMatch = false;
     for (const chip of group.querySelectorAll('[data-act="attend"]')) {
-      chip.hidden = !matchesPlayerName(P(chip.dataset.v)?.name || "", search.value);
+      chip.hidden = !matchesPlayerName(P(chip.dataset.v)?.name || "", query);
       groupHasMatch ||= !chip.hidden;
     }
     group.hidden = !groupHasMatch;
