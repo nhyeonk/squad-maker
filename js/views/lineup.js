@@ -39,10 +39,10 @@ function pitchLines(futsal) {
 
 /** 동그라미 오른쪽 위 숫자: 출전 / 골 / 공격포인트 / 끄기 */
 export const BADGES = [
+  ["none", "끄기"],
   ["apps", "출전"],
   ["goals", "골"],
   ["ap", "공격P"],
-  ["none", "숫자 끄기"],
 ];
 function badgeValue(st, pid) {
   const s = st[pid];
@@ -77,9 +77,9 @@ function side(l, T) {
     .map((pid) => `<button class="bchip ${isSel(pid) ? "sel" : ""}" data-act="pl" data-v="${pid}" data-pdrag="${pid}">${playerName(pid)}</button>`)
     .join("");
   return `<div class="side">
-    <div class="sidebox"><b><span class="pb GK">심</span>심판</b><div style="font-size:11px;opacity:.7;margin-bottom:5px">모든 팀 공통</div>
-      <input data-chg="referee" value="${esc(l.referee || "")}" placeholder="이름" ${S.canEdit ? "" : "disabled"}></div>
-    <div class="sidebox" data-drop="bench"><b>후보 <span style="opacity:.6">${T.bench.length}</span></b>${bench}
+    <div class="sidebox"><label class="sidebox-title" for="lineup-referee">심판</label><div class="sidebox-hint">모든 팀 공통</div>
+      <input id="lineup-referee" data-chg="referee" value="${esc(l.referee || "")}" placeholder="이름" ${S.canEdit ? "" : "disabled"}></div>
+    <div class="sidebox" data-drop="bench"><b class="sidebox-title">후보 <span class="sidebox-count">${T.bench.length}명</span></b>${bench}
       ${S.canEdit ? `<button class="drop" data-act="tobench">${S.ui.sel ? "여기로 ↓" : "+ 후보"}</button>` : ""}</div>
   </div>`;
 }
@@ -219,13 +219,14 @@ export function viewLineup() {
   ${S.canEdit ? attendeesCard(l) : ""}
   <section class="card lineup-pitch" id="lineup-result" aria-label="경기장">
     <div class="teamtabs">${tabs}</div>
-    <div class="ctrls">
-      <label class="lb">인원</label>
-      <select class="in" data-chg="size" ${dis}>${sizes.map((n) => `<option value="${n}" ${n === l.size ? "selected" : ""}>${n} vs ${n}${n === 5 ? " (풋살)" : ""}</option>`).join("")}</select>
-      <label class="lb">포메이션</label>
-      <select class="in" data-chg="formation" ${dis}>${FORMATIONS[l.size].map((f) => `<option ${f === l.formation ? "selected" : ""}>${f}</option>`).join("")}</select>
-      <select class="in" data-chg="badge" title="동그라미 숫자">${BADGES.map(([k, t]) => `<option value="${k}" ${S.ui.badge === k ? "selected" : ""}>${k === "none" ? t : "숫자: " + t}</option>`).join("")}</select>
-      <button class="iconbtn" data-act="autoplace" title="선호 포지션대로 다시 배치" data-edit><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12a9 9 0 109-9 9.7 9.7 0 00-6.7 2.8L3 8"/><path d="M3 3v5h5"/></svg></button>
+    <div class="lineup-controls">
+      <label class="lineup-control"><span>인원</span>
+        <select class="in" data-chg="size" ${dis}>${sizes.map((n) => `<option value="${n}" ${n === l.size ? "selected" : ""}>${n} vs ${n}${n === 5 ? " (풋살)" : ""}</option>`).join("")}</select></label>
+      <label class="lineup-control"><span>포메이션</span>
+        <select class="in" data-chg="formation" ${dis}>${FORMATIONS[l.size].map((f) => `<option ${f === l.formation ? "selected" : ""}>${f}</option>`).join("")}</select></label>
+      <label class="lineup-control"><span>숫자 표시</span>
+        <select class="in" data-chg="badge">${BADGES.map(([k, t]) => `<option value="${k}" ${S.ui.badge === k ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+      <button class="iconbtn lineup-autoplace" data-act="autoplace" aria-label="선호 포지션대로 다시 배치" title="선호 포지션대로 다시 배치" data-edit><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12a9 9 0 109-9 9.7 9.7 0 00-6.7 2.8L3 8"/><path d="M3 3v5h5"/></svg><span>다시 배치</span></button>
     </div>
     <div class="pitchwrap">${pitch(l, T, slots)}${side(l, T)}</div>
     <div class="legend"><span><i style="border-color:var(--fw)"></i>FW</span><span><i style="border-color:var(--mf)"></i>MF</span><span><i style="border-color:var(--df)"></i>DF</span><span><i style="border-color:var(--gk)"></i>GK</span></div>
