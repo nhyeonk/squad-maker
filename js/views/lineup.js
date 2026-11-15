@@ -59,7 +59,7 @@ function pitch(l, T, slots) {
       const p = pid && P(pid);
       const n = p ? badgeValue(st, pid) : 0;
       return `<button class="slot ${p ? "filled" : ""} ${p && isSel(pid) ? "sel" : ""} ${sel && !p ? "target" : ""}"
-        style="left:${s.x}%;top:${s.y}%;--tc:${T.color}" data-act="slot" data-v="${i}" data-drag="${i}">
+        style="--slot-x:${s.x}%;--slot-y:${s.y}%;--tc:${T.color}" data-act="slot" data-v="${i}" data-drag="${i}">
         <span class="cir role-${s.role}">${p ? `<span class="rl">${esc(s.label)}</span>${n ? `<span class="nb">${n}</span>` : ""}` : esc(s.label)}</span>
         ${p ? `<span class="nm">${playerName(pid)}</span>` : ""}</button>`;
     })

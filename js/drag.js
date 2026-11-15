@@ -9,8 +9,7 @@ import { render, commitLineup } from "./render.js";
 
 /* ---------- 경기장: 끌어서 옮기기 / 빈 잔디 눌러서 옮기기 ---------- */
 const clamp = (v) => Math.max(4, Math.min(96, v));
-export function pitchPoint(e, offset) {
-  const r = document.getElementById("pitch").getBoundingClientRect();
+export function pitchPoint(e, offset, r = document.getElementById("pitch").getBoundingClientRect()) {
   return {
     x: clamp(((e.clientX - r.left) / r.width) * 100 - (offset?.x ?? 0)),
     y: clamp(((e.clientY - r.top) / r.height) * 100 - (offset?.y ?? 0)),
@@ -110,10 +109,15 @@ function bindPitchDrag() {
     if (idx === 0) return;
     const pid = lineup().teams[S.ui.team].slots[idx] || null;
     const slot = currentSlots()[idx];
-    const start = pitchPoint(e);
-    const offset = { x: start.x - slot.x, y: start.y - slot.y };
+    const pitchRect = document.getElementById("pitch").getBoundingClientRect();
+    const box = el.getBoundingClientRect();
+    // 가장자리에서는 화면에 표시된 위치를 기준으로 잡은 지점을 유지해요.
+    const offset = {
+      x: (e.clientX - (box.left + box.width / 2)) / pitchRect.width * 100,
+      y: (e.clientY - (box.top + box.height / 2)) / pitchRect.height * 100,
+    };
     drag = { el, idx, pid, sx: e.clientX, sy: e.clientY, moving: false, id: e.pointerId,
-      ox: el.style.left, oy: el.style.top, offset, previous: slot.label };
+      ox: el.style.getPropertyValue("--slot-x"), oy: el.style.getPropertyValue("--slot-y"), offset, previous: slot.label };
   });
   document.addEventListener("pointermove", (e) => {
     if (!drag || e.pointerId !== drag.id) return;
@@ -134,9 +138,9 @@ function bindPitchDrag() {
       drag.ghost = null;
       drag.el.classList.remove("faded");
       markDropOver(null);
-      const pt = pitchPoint(e, drag.offset);
-      drag.el.style.left = pt.x + "%";
-      drag.el.style.top = pt.y + "%";
+      const pt = pitchPoint(e, drag.offset, r);
+      drag.el.style.setProperty("--slot-x", pt.x + "%");
+      drag.el.style.setProperty("--slot-y", pt.y + "%");
       const target = pitchDropAt(pt, { skip: drag.idx, previous: drag.previous });
       drag.previous = target.label;
       showPitchZone(target.zone);
@@ -154,8 +158,8 @@ function bindPitchDrag() {
         drag.ghost.className = "dragghost";
         drag.ghost.textContent = P(drag.pid)?.name || "";
         document.body.appendChild(drag.ghost);
-        drag.el.style.left = drag.ox;
-        drag.el.style.top = drag.oy;
+        drag.el.style.setProperty("--slot-x", drag.ox);
+        drag.el.style.setProperty("--slot-y", drag.oy);
         drag.el.classList.add("faded");
       }
       drag.ghost.style.left = e.clientX + "px";
