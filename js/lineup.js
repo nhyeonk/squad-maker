@@ -1,7 +1,7 @@
 // 라인업 로직: 선수 이동/교체, 자동 배치, 밸런스 팀 나누기
 import { S, P, lineup } from "./state.js";
 import { formationSlots, roleOfLabel } from "./formations.js";
-import { fit } from "./players.js";
+import { fit, tierWeight } from "./players.js";
 import { shuffle } from "./utils.js";
 
 /**
@@ -129,10 +129,10 @@ export function relayoutAll() {
 }
 
 /**
- * 실력(★, 0.5 단위)과 포지션을 보고 참가자 전원을 팀 수만큼 공정하게 나눠요.
+ * 직접 지정한 티어와 선호 포지션으로 참가자를 나눠요.
  *
  * 1) 여러 번 무작위로 나눠 본 뒤, 두 팀 사이에서 선수를 맞바꿔 점수가 좋아지는 동안 계속 바꿔요 (언덕 오르기)
- * 2) 점수(낮을수록 공정) = 팀별 별 합계 차이 + 포지션 쏠림(공격/미드/수비/골키퍼) + 골키퍼 몰림
+ * 2) 점수(낮을수록 공정) = 팀별 티어 점수 차이 + 포지션 쏠림(공격/미드/수비/골키퍼) + 골키퍼 몰림
  * 3) 가장 공정한 조합들 중에서 하나를 무작위로 골라, 누를 때마다 조합이 달라져요
  * 인원이 다른 팀(예: 11 vs 10)은 인원 비율만큼 합계를 맞춰요.
  */
@@ -142,10 +142,10 @@ export function balanceSplit() {
   const ids = l.attendees.filter((id) => P(id));
   if (!ids.length) return false;
 
-  const sk = ids.map((id) => P(id).skill ?? 3);
+  const weights = ids.map((id) => tierWeight(P(id)));
   const role = ids.map((id) => (P(id).pos || [])[0] || "X");
   const n = ids.length;
-  const total = sk.reduce((a, b) => a + b, 0);
+  const total = weights.reduce((a, b) => a + b, 0);
   const sizes = Array.from({ length: k }, (_, t) => Math.floor(n / k) + (t < n % k ? 1 : 0));
   const gkCount = role.filter((r) => r === "GK").length;
 
@@ -153,12 +153,12 @@ export function balanceSplit() {
   const cost = (asg) => {
     const sum = Array(k).fill(0), cnt = Array(k).fill(0), roles = Array.from({ length: k }, () => ({}));
     asg.forEach((t, i) => {
-      sum[t] += sk[i];
+      sum[t] += weights[i];
       cnt[t]++;
       roles[t][role[i]] = (roles[t][role[i]] || 0) + 1;
     });
     let c = 0;
-    for (let t = 0; t < k; t++) c += Math.abs(sum[t] - (total * cnt[t]) / n) * 10; // 별 합계 차이 (가장 중요)
+    for (let t = 0; t < k; t++) c += Math.abs(sum[t] - (total * cnt[t]) / n) * 10; // 티어 점수 차이 (가장 중요)
     for (const r of ["FW", "MF", "DF"]) {
       const v = roles.map((x) => x[r] || 0);
       c += Math.max(0, Math.max(...v) - Math.min(...v) - 1) * 3; // 같은 포지션이 한 팀에 몰리면 감점
@@ -207,9 +207,6 @@ export function balanceSplit() {
   for (let t = 0; t < k; t++) autoPlace(t, shuffle(ids.filter((_, i) => pick[i] === t)));
   return true;
 }
-
-/** 팀별 별 합계 (화면 표시용) */
-export const teamSkillSum = (T) => teamPlayers(T).filter(P).reduce((a, id) => a + (P(id).skill ?? 3), 0);
 
 /** 대기 명단 선수로 지금 보는 팀의 빈자리 채우기 */
 export function fillEmpty(teamIdx) {

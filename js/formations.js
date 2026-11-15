@@ -1,4 +1,5 @@
 // 인원별 포메이션과 경기장 위 자리 좌표
+import { pitchPosition, pitchZoneCenter } from "./pitch-zones.js";
 
 /** 인원(골키퍼 포함) → 고를 수 있는 포메이션 (필드 플레이어 라인, 뒤에서 앞으로) */
 export const FORMATIONS = {
@@ -46,30 +47,30 @@ const ROLE_OF = {};
 for (const [role, list] of Object.entries(POSITION_GROUPS)) list.forEach((l) => (ROLE_OF[l] = role));
 export const roleOfLabel = (label) => ROLE_OF[String(label).toUpperCase()] || "MF";
 
-/** 자리를 옮기면 가장 가까운 기준점의 이름으로 바뀌어요 (x: 왼→오, y: 위=공격) */
-const ANCHORS = [
-  ["LW", 15, 20], ["RW", 85, 20], ["ST", 50, 13], ["LS", 37, 16], ["RS", 63, 16], ["SS", 50, 27], ["LF", 27, 22], ["RF", 73, 22],
-  ["LAM", 28, 35], ["CAM", 50, 36], ["RAM", 72, 35],
-  ["LM", 12, 48], ["LCM", 34, 49], ["CM", 50, 48], ["RCM", 66, 49], ["RM", 88, 48],
-  ["LDM", 36, 61], ["CDM", 50, 61], ["RDM", 64, 61],
-  ["LWB", 10, 63], ["RWB", 90, 63], ["LB", 13, 74], ["RB", 87, 74],
-  ["LCB", 34, 76], ["CB", 50, 77], ["RCB", 66, 76], ["SW", 50, 84], ["GK", 50, 92],
-];
-export function nearestLabel(x, y) {
-  let best = "CM", bd = Infinity;
-  for (const [l, ax, ay] of ANCHORS) {
-    const d = (ax - x) ** 2 + ((ay - y) * 1.3) ** 2; // 세로 차이를 조금 더 크게 봐요
-    if (d < bd) [best, bd] = [l, d];
-  }
-  return best;
-}
+// 공식 11인 포메이션에서 표시하는 포지션과 좌표. 저장된 슬롯 순서(뒤에서 앞으로, 왼쪽에서 오른쪽)는 유지해요.
+const FC_PRESETS = {
+  "4-4-2": [["LB",10,85],["LCB",35,88],["RCB",65,88],["RB",90,85],
+    ["LM",13,35],["LCM",35,43],["RCM",65,43],["RM",88,35],["LS",34,0],["RS",65,0]],
+  "4-3-3": [["LB",6,85],["LCB",32,88],["RCB",69,88],["RB",94,85],
+    ["LCM",27,53],["CM",50,58],["RCM",73,53],["LW",22,4],["ST",50,0],["RW",78,4]],
+  "4-2-3-1": [["LB",5,88],["LCB",32,100],["RCB",68,100],["RB",95,88],
+    ["LDM",34,72],["RDM",66,72],["LAM",22,32],["CAM",50,36],["RAM",78,32],["ST",50,0]],
+  "4-1-4-1": [["LB",9,88],["LCB",36,90],["RCB",63,90],["RB",91,88],["CDM",50,65],
+    ["LM",9,37],["LCM",36,47],["RCM",64,47],["RM",91,37],["ST",50,6]],
+  "5-3-2": [["LWB",12,71],["LCB",28,93],["CB",50,90],["RCB",72,93],["RWB",88,71],
+    ["LCM",29,50],["CM",50,52],["RCM",71,50],["LS",37,10],["RS",63,10]],
+  "3-4-3": [["LB",26,100],["CB",50,86],["RB",75,100],
+    ["LM",12,40],["LCM",38,43],["RCM",63,43],["RM",88,40],["LW",10,6],["ST",50,6],["RW",90,6]],
+};
 
 /**
  * 포메이션의 자리 목록. 좌표는 % (x: 왼→오, y: 위=공격 방향)
  * @returns {{role:"GK"|"DF"|"MF"|"FW", label:string, x:number, y:number}[]}
  */
 export function formationSlots(size, formation) {
-  const slots = [{ role: "GK", label: "GK", x: 50, y: 91 }];
+  const slots = [{ role: "GK", label: "GK", ...pitchPosition(50, 115) }];
+  const preset = size === 11 ? FC_PRESETS[formation] : null;
+  if (preset) return slots.concat(preset.map(([label, x, y]) => ({ role: roleOfLabel(label), label, ...pitchPosition(x, y) })));
   const lines = formation.split("-").map(Number);
   const L = lines.length;
 
@@ -85,13 +86,7 @@ export function formationSlots(size, formation) {
       key = L >= 4 && n <= 3 ? (firstMid ? "DM" : lastMid ? "AM" : "MF") : "MF";
     }
 
-    const labels = (LABELS[key][n] || Array(n).fill(role)).slice();
-
-    const y = L === 1 ? 52 : 74 - i * (56 / (L - 1));
-    for (let j = 0; j < n; j++) {
-      const x = n === 1 ? 50 : n === 2 ? (j ? 70 : 30) : 14 + j * (72 / (n - 1));
-      slots.push({ role, label: labels[j] || role, x, y });
-    }
+    for (const label of LABELS[key][n]) slots.push({ role, label, ...pitchZoneCenter(label) });
   });
   return slots;
 }

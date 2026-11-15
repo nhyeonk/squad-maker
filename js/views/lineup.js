@@ -1,30 +1,40 @@
 // 라인업 탭 화면
-import { S, P, pname, lineup } from "../state.js";
+import { S, P, lineup } from "../state.js";
 import { FORMATIONS, FUTSAL_MAX } from "../formations.js";
 import { currentSlots, teamPlayers, poolList, locate } from "../lineup.js";
+import { TIERS, playerTier } from "../players.js";
+import { pitchPosition, PITCH_ZONES } from "../pitch-zones.js";
 import { esc } from "../utils.js";
 import { attendanceCounts, computeStats } from "../stats.js";
-import { posBadge, dot } from "./common.js";
+import { posBadge, dot, playerName } from "./common.js";
 
 const isSel = (pid) => S.ui.sel === pid;
 
 function pitchLines(futsal) {
-  const L = (style) => `<div class="ln" style="${style}"></div>`;
-  return futsal
-    ? L("left:4%;right:4%;top:3%;bottom:3%") +
-        L("left:4%;right:4%;top:50%;height:0;border-width:2px 0 0") +
-        L("left:50%;top:50%;width:26%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%)") +
-        `<div class="spot"></div>` +
-        L("left:22%;right:22%;top:3%;height:13%;border-top:0;border-radius:0 0 50% 50%") +
-        L("left:22%;right:22%;bottom:3%;height:13%;border-bottom:0;border-radius:50% 50% 0 0")
-    : L("left:3%;right:3%;top:2%;bottom:2%") +
-        L("left:3%;right:3%;top:50%;height:0;border-width:2px 0 0") +
-        L("left:50%;top:50%;width:26%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%)") +
-        `<div class="spot"></div>` +
-        L("left:20%;right:20%;top:2%;height:16%;border-top:0") +
-        L("left:36%;right:36%;top:2%;height:6%;border-top:0") +
-        L("left:20%;right:20%;bottom:2%;height:16%;border-bottom:0") +
-        L("left:36%;right:36%;bottom:2%;height:6%;border-bottom:0");
+  const points = (pairs) => pairs.map(([u, v]) => {
+    const { x, y } = pitchPosition(u, v);
+    return `${x.toFixed(3)},${y.toFixed(3)}`;
+  }).join(" ");
+  const line = (pairs) => `<polyline class="pitch-mark" points="${points(pairs)}"/>`;
+  const arc = (cx, cy, rx, ry, start, end) => Array.from({ length: 25 }, (_, i) => {
+    const angle = start + (end - start) * i / 24;
+    return [cx + rx * Math.cos(angle), cy + ry * Math.sin(angle)];
+  });
+  const center = pitchPosition(50, 50);
+  const areas = futsal
+    ? line(arc(50, 2, 28, 14, 0, Math.PI)) + line(arc(50, 98, 28, 14, Math.PI, Math.PI * 2))
+    : line([[20, 2], [20, 18], [80, 18], [80, 2]]) + line([[36, 2], [36, 8], [64, 8], [64, 2]]) +
+      line([[20, 98], [20, 82], [80, 82], [80, 98]]) + line([[36, 98], [36, 92], [64, 92], [64, 98]]);
+  return `<svg class="pitch-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <defs><pattern id="pitch-grass" width="100" height="14" patternUnits="userSpaceOnUse" y="12">
+      <rect class="pitch-grass-a" width="100" height="7"/><rect class="pitch-grass-b" y="7" width="100" height="7"/>
+    </pattern></defs>
+    <polygon points="${points([[0, 0], [100, 0], [100, 100], [0, 100]])}" fill="url(#pitch-grass)"/>
+    ${line([[4, 2], [96, 2], [96, 98], [4, 98], [4, 2]])}${line([[4, 50], [96, 50]])}
+    ${line(arc(50, 50, 13, 9, 0, Math.PI * 2))}${areas}
+    <ellipse class="pitch-spot" cx="${center.x}" cy="${center.y}" rx=".5" ry=".35"/>
+    <polygon class="pitch-goalkeeper-area" points="${PITCH_ZONES.GK.points}"/>
+  </svg>`;
 }
 
 /** 동그라미 오른쪽 위 숫자: 출전 / 골 / 공격포인트 / 끄기 */
@@ -51,18 +61,20 @@ function pitch(l, T, slots) {
       return `<button class="slot ${p ? "filled" : ""} ${p && isSel(pid) ? "sel" : ""} ${sel && !p ? "target" : ""}"
         style="left:${s.x}%;top:${s.y}%;--tc:${T.color}" data-act="slot" data-v="${i}" data-drag="${i}">
         <span class="cir role-${s.role}">${p ? `<span class="rl">${esc(s.label)}</span>${n ? `<span class="nb">${n}</span>` : ""}` : esc(s.label)}</span>
-        ${p ? `<span class="nm">${esc(p.name)}</span>` : ""}</button>`;
+        ${p ? `<span class="nm">${playerName(pid)}</span>` : ""}</button>`;
     })
     .join("");
   const futsal = l.size <= FUTSAL_MAX;
   return `<div class="pitch ${futsal ? "futsal" : ""} ${sel && S.canEdit ? "picking" : ""}" id="pitch" data-act="pitch">
-    <span class="tag">${esc(T.name)} · ${l.size}인 ${esc(l.formation)}</span>${pitchLines(futsal)}${slotHtml}</div>`;
+    <span class="tag">${esc(T.name)} · ${l.size}인 ${esc(l.formation)}</span>${pitchLines(futsal)}
+    <svg class="pitch-zones" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" hidden><polygon data-position-zone=""/></svg>
+    ${slotHtml}</div>`;
 }
 
 function side(l, T) {
   const bench = T.bench
     .filter(P)
-    .map((pid) => `<button class="bchip ${isSel(pid) ? "sel" : ""}" data-act="pl" data-v="${pid}" data-pdrag="${pid}">${esc(pname(pid))}</button>`)
+    .map((pid) => `<button class="bchip ${isSel(pid) ? "sel" : ""}" data-act="pl" data-v="${pid}" data-pdrag="${pid}">${playerName(pid)}</button>`)
     .join("");
   return `<div class="side">
     <div class="sidebox"><b><span class="pb GK">심</span>심판</b><div style="font-size:11px;opacity:.7;margin-bottom:5px">모든 팀 공통</div>
@@ -74,28 +86,31 @@ function side(l, T) {
 
 function attendeesCard(l) {
   const counts = attendanceCounts();
-  const notHere = Object.values(S.players).filter((p) => !l.attendees.includes(p.id));
+  const players = Object.values(S.players);
+  const attendeeIds = new Set(l.attendees.filter(P));
+  const notHere = players.filter((p) => !attendeeIds.has(p.id));
   const regulars = notHere.filter((p) => p.regular).sort((a, b) => a.name.localeCompare(b.name, "ko"));
   const others = notHere
     .filter((p) => !p.regular)
     .sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0) || a.name.localeCompare(b.name, "ko"));
   const chip = (p) =>
-    `<button class="chip ghost" data-act="attend" data-v="${p.id}">+ ${esc(p.name)}${counts[p.id] ? ` <span style="font-size:11px;color:var(--mute)">${counts[p.id]}</span>` : ""}</button>`;
-  const hasRegular = Object.values(S.players).some((p) => p.regular);
-
-  return `<div class="card" data-edit>
-    <h3>오늘 참가자 <span class="badge">${l.attendees.filter(P).length}명</span></h3>
-    ${regulars.length ? `<button class="btn pri block" data-act="attendregulars">⭐ 고정 참여 모두 추가 (${regulars.length}명)</button>
-      <div class="chips" style="margin:8px 0 4px">${regulars.map(chip).join("")}</div>` : ""}
-    ${others.length ? `<details class="others" ${regulars.length ? "" : "open"}><summary>${hasRegular ? "그 외 멤버" : "지난 참가자"} ${others.length}명 · 많이 온 순</summary>
-      <div class="chips" style="margin-top:6px">${others.map(chip).join("")}</div></details>` : ""}
-    ${!hasRegular && Object.keys(S.players).length ? `<p class="hint">매주 오는 사람은 아래 <b>⭐ 고정 참여 명단</b>에 넣어 두면 한 번에 추가할 수 있어요.</p>` : ""}
-    <div style="border-top:1px solid var(--soft);margin:12px 0;"></div>
-    <form class="row" data-act="addnames"><input class="in" name="n" placeholder="새 이름 입력 (여러 명은 쉼표로)" autocomplete="off"><button class="btn pri">추가</button></form>
-    <button class="btn kakao block" style="margin-top:8px" data-act="ocr">📷 카톡 투표 캡처로 추가</button>
-    <button class="btn ghost block" style="margin-top:8px" data-act="roster">⭐ 고정 참여 명단 ${Object.values(S.players).filter((p) => p.regular).length ? `<span class="badge">${Object.values(S.players).filter((p) => p.regular).length}명</span>` : "만들기"}</button>
-    <p class="hint">같은 이름은 같은 선수로 기록이 이어져요.</p>
-  </div>`;
+    `<button class="chip ghost" data-act="attend" data-v="${p.id}">+ ${playerName(p.id)}${counts[p.id] ? ` <span style="font-size:11px;color:var(--mute)">${counts[p.id]}</span>` : ""}</button>`;
+  return `<section class="card lineup-setup">
+    <h3>오늘 참가자 <span class="badge">${attendeeIds.size}명</span></h3>
+    <form class="row" data-act="addnames"><input class="in" name="n" aria-label="참가자 이름" placeholder="이름 입력 (여러 명은 쉼표로)" autocomplete="off"><button class="btn ghost">추가</button></form>
+    <div class="lineup-quick-actions">
+      <button class="btn kakao sm" data-act="ocr">📷 카톡 투표 캡처</button>
+      ${regulars.length ? `<button class="btn ghost sm" data-act="attendregulars">⭐ 고정 ${regulars.length}명 추가</button>` : ""}
+    </div>
+    <details class="others lineup-members" data-act-toggle="lineupMembersOpen" ${S.ui.lineupMembersOpen ? "open" : ""}>
+      <summary>기존 선수에서 추가 <span>${notHere.length}명</span></summary>
+      ${regulars.length ? `<div class="lineup-member-group"><strong>고정 참여</strong><div class="chips">${regulars.map(chip).join("")}</div></div>` : ""}
+      ${others.length ? `<div class="lineup-member-group"><strong>지난 참가자 · 많이 온 순</strong><div class="chips">${others.map(chip).join("")}</div></div>` : ""}
+      ${notHere.length ? "" : `<p class="hint">${players.length ? "등록된 선수는 모두 참가자에 들어 있어요." : "아직 등록된 선수가 없어요."}</p>`}
+      <button class="btn ghost sm" data-act="roster">고정 참여 명단 관리</button>
+    </details>
+    <button class="btn pri block lineup-split" data-act="split" ${attendeeIds.size ? "" : "disabled"}>⚖️ ${l.teams.length}팀 밸런스 나누기</button>
+  </section>`;
 }
 
 function poolCard(l) {
@@ -103,44 +118,44 @@ function poolCard(l) {
   return `<div class="card" data-drop="pool">
     <h3>대기 명단 <span class="badge">${pool.length}명</span></h3>
     ${pool.length
-      ? `<div class="chips">${pool.map((id) => `<button class="chip ${isSel(id) ? "sel" : ""}" data-act="pl" data-v="${id}" data-pdrag="${id}">${posBadge(id)} ${esc(pname(id))}<span class="x" data-act="unattend" data-v="${id}" data-edit>×</span></button>`).join("")}</div>`
+      ? `<div class="chips">${pool.map((id) => `<button class="chip ${isSel(id) ? "sel" : ""}" data-act="pl" data-v="${id}" data-pdrag="${id}">${posBadge(id)} ${playerName(id)}<span class="x" data-act="unattend" data-v="${id}" data-edit>×</span></button>`).join("")}</div>`
       : `<div class="empty">${l.attendees.length ? "모두 팀에 배치됐어요." : "먼저 위에서 참가자 이름을 추가하세요."}</div>`}
     <div class="grid2" style="margin-top:12px" data-edit>
-      <button class="btn pri" data-act="split">⚖️ ${l.teams.length}팀 밸런스 나누기</button>
       <button class="btn" data-act="fill">빈자리 채우기</button>
       <button class="btn" data-act="clearteam">이 팀 비우기</button>
       <button class="btn" data-act="resetall">전체 초기화</button>
     </div>
-    <p class="hint" data-edit>선수를 <b>끌어서</b> 경기장·후보·팀 명단으로 옮길 수 있어요. 폰에서는 살짝 길게 눌렀다가 끌어요. 밸런스 나누기는 <b>별 합계가 최대한 같아지게</b> 나누고 포지션도 고르게 섞어요.</p>
+    <p class="hint" data-edit>선수를 <b>끌어서</b> 경기장·후보·팀 명단으로 옮길 수 있어요. 폰에서는 살짝 길게 눌렀다가 끌어요. 밸런스 나누기는 <b>티어와 선호 포지션</b>을 고려해요. 티어 미지정 선수는 B와 같은 비중으로 계산해요.</p>
   </div>`;
 }
 
-function teamsCard(l, t, slots) {
+function teamsCard(l, t) {
   const sel = S.ui.sel;
   const selLoc = sel && locate(sel);
+  const tierRank = (id) => TIERS[playerTier(P(id))]?.weight ?? 0;
   const cards = l.teams
     .map((x, i) => {
-      const ids = teamPlayers(x).filter(P);
+      const ids = teamPlayers(x).filter(P).sort((a, b) => tierRank(b) - tierRank(a));
+      const active = i === t;
       const canDrop = sel && selLoc && !(selLoc.kind !== "pool" && selLoc.team === i);
-      const sum = ids.reduce((a, id) => a + (P(id).skill ?? 3), 0);
-      const avg = ids.length ? `★${sum.toFixed(1)} (평균 ${(sum / ids.length).toFixed(1)})` : "★-";
       const action = canDrop
         ? `<button class="btn sm pri" data-act="toteam" data-v="${i}">여기로 이동</button>`
-        : i === t
-          ? `<span style="font-size:12px;color:var(--sub)">보는 중</span>`
-          : `<button class="btn sm ghost" data-act="team" data-v="${i}">보기 →</button>`;
+        : active ? "" : `<button class="btn sm ghost" data-act="team" data-v="${i}">보기 →</button>`;
+      const status = active ? `<span class="team-viewing">보는 중</span>` : "";
       const chips = ids.length
         ? ids
             .map((id) => {
               const lc = locate(id);
               const role = lc?.kind === "slot" ? currentSlots(i)[lc.slot]?.label : "후보";
-              return `<button class="chip ${isSel(id) ? "sel" : ""}" data-act="pl" data-v="${id}" data-pdrag="${id}">${esc(pname(id))} <span style="font-size:10.5px;color:var(--sub)">${esc(role)}</span></button>`;
+              return `<button class="chip ${isSel(id) ? "sel" : ""}" data-act="pl" data-v="${id}" data-pdrag="${id}">${playerName(id)} <span style="font-size:10.5px;color:var(--sub)">${esc(role)}</span></button>`;
             })
             .join("")
         : `<span class="hint" style="margin:0">아직 배치된 선수가 없어요.</span>`;
-      return `<div class="tcard ${i === t ? "on" : ""} ${canDrop ? "drop" : ""}" data-drop="team:${i}">
-        <div class="th">${dot(x.color)}${esc(x.name)} <span class="badge">${ids.length}명</span>
-          <span style="font-size:11.5px;color:var(--sub);font-weight:600">${avg}</span><span class="sp"></span>${action}</div>
+      return `<div class="tcard ${active ? "on" : ""} ${canDrop ? "drop" : ""}" data-drop="team:${i}">
+        <div class="th">
+          <div class="team-card-title">${dot(x.color)}<span class="team-card-name" title="${esc(x.name)}">${esc(x.name)}</span><span class="badge">${ids.length}명</span></div>
+          <div class="team-card-actions">${status}${action}</div>
+        </div>
         <div class="chips">${chips}</div></div>`;
     })
     .join("");
@@ -167,8 +182,9 @@ export function viewLineup() {
     .join("");
   const sizes = Object.keys(FORMATIONS).map(Number);
 
-  return `<div class="layout">
-  <section class="card" style="padding:12px">
+  return `<div class="layout${S.canEdit ? "" : " lineup-readonly"}">
+  ${S.canEdit ? attendeesCard(l) : ""}
+  <section class="card lineup-pitch" id="lineup-result" aria-label="경기장">
     <div class="teamtabs">${tabs}</div>
     <div class="ctrls">
       <label class="lb">인원</label>
@@ -180,14 +196,14 @@ export function viewLineup() {
     </div>
     <div class="pitchwrap">${pitch(l, T, slots)}${side(l, T)}</div>
     <div class="legend"><span><i style="border-color:var(--fw)"></i>FW</span><span><i style="border-color:var(--mf)"></i>MF</span><span><i style="border-color:var(--df)"></i>DF</span><span><i style="border-color:var(--gk)"></i>GK</span></div>
-    <p class="hint" data-edit>선수를 <b>끌어서</b> 원하는 곳에 놓으면 자리가 옮겨지고, 다른 선수 위에 놓으면 서로 바뀌어요. 경기장 밖 <b>대기 명단·후보·팀 명단</b>으로 끌어내도 돼요. 눌러서 선택한 뒤 빈 잔디를 눌러도 돼요. 포지션 이름은 위치에 맞게 바뀌고, 아래 바의 <b>포지션</b>으로 직접 고를 수도 있어요.</p>
+    <p class="hint" data-edit>선수를 <b>끌면 초록색으로 표시되는 구역</b>이 새 포지션이에요. 그 자리에 선수가 있으면 서로 바뀌어요. 골키퍼 자리는 고정이고, 선수를 선택한 뒤 GK 자리를 눌러 교체할 수 있어요.</p>
     <div style="display:grid;gap:8px;margin-top:12px">
       <div class="grid2"><button class="btn" data-act="img">🖼️ 스쿼드 이미지 저장</button><button class="btn" data-act="copytext">📋 명단 텍스트 복사</button></div>
       <button class="btn block" data-act="laundry">🧺 빨래 당번 뽑기 (룰렛 · 사다리)</button>
       <button class="btn pri block" data-act="startmatch" data-edit>⚽ 이 라인업으로 경기 기록 시작</button>
     </div>
   </section>
-  <aside>${attendeesCard(l)}${poolCard(l)}${teamsCard(l, t, slots)}</aside>
+  <aside class="lineup-lists">${poolCard(l)}${teamsCard(l, t)}</aside>
   </div>`;
 }
 
@@ -198,7 +214,7 @@ export function viewSelbar() {
   const loc = locate(sel);
   const onPitch = loc?.kind === "slot" && loc.team === S.ui.team;
   const label = onPitch ? currentSlots()[loc.slot]?.label : "";
-  return `<div class="selbar"><span><b>${esc(pname(sel))}</b> ${onPitch ? esc(label) : "선택됨"}</span>
+  return `<div class="selbar"><span><b>${playerName(sel)}</b> ${onPitch ? esc(label) : "선택됨"}</span>
     ${onPitch && S.canEdit ? `<button class="btn sm" data-act="posopen" data-v="${loc.slot}">포지션</button>` : ""}
     <button class="btn sm" data-act="info" data-v="${sel}">정보</button>
     ${loc?.kind !== "pool" ? `<button class="btn sm" data-act="topool">대기로</button>` : ""}

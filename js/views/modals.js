@@ -1,6 +1,7 @@
 // 팝업 창들: 선수 정보, 골 입력, 경기 시작, 출전 선수 추가, 설정
 import { S, P, pname, lineup } from "../state.js";
 import { POS, POS_KO, POSITION_GROUPS, PREF_DETAIL } from "../formations.js";
+import { playerTier } from "../players.js";
 import { computeStats, scoreOf } from "../stats.js";
 import { teamPlayers, currentSlots } from "../lineup.js";
 import { renderSquadCanvas } from "../share.js";
@@ -8,7 +9,7 @@ import { defaultMatchTitle, recentPlaces, shortDate } from "../matches.js";
 import { getCfg, groupId } from "../store.js";
 import { GROUP_ID, APP_VERSION } from "../config.js";
 import { $, esc, fmtDate, todayStr } from "../utils.js";
-import { dot, prefList } from "./common.js";
+import { dot, playerName, prefList, tierBadge, tierSelect } from "./common.js";
 
 export function openModal(html) {
   S.ui.settingsOpen = false;
@@ -57,24 +58,13 @@ export function openPlayer(pid) {
     : "";
   const shown = prefList(p);
   const chosen = shown.length ? `<div class="pchosen">선호: ${shown.map(([t, r]) => `<span class="pb ${r}">${t}</span>`).join(" ")}</div>` : "";
-  // 별을 누를 때마다: 빈 별 → 반 별 → 꽉 찬 별 → 다시 빈 별.  − / + 는 0.5씩
-  const sk = p.skill ?? 3;
-  const stars =
-    `<button class="stepbtn" data-act="pstep" data-v="${pid}:-0.5" aria-label="0.5 내리기" ${sk <= 0 ? "disabled" : ""}>−</button>` +
-    [1, 2, 3, 4, 5]
-      .map((n) => {
-        const fill = sk >= n ? "full" : sk >= n - 0.5 ? "half" : "";
-        return `<button class="star ${fill}" data-act="pstar" data-v="${pid}:${n}" aria-label="별 ${n}">★</button>`;
-      })
-      .join("") +
-    `<button class="stepbtn" data-act="pstep" data-v="${pid}:0.5" aria-label="0.5 올리기" ${sk >= 5 ? "disabled" : ""}>+</button>` +
-    `<b class="skn">${sk.toFixed(1)}</b>`;
+  const tier = playerTier(p);
 
-  openModal(`<h2>${ed ? `<input class="in" id="pnm" value="${esc(p.name)}" style="font-weight:800;font-size:17px">` : esc(p.name)}${closeBtn}</h2>
+  openModal(`<h2>${ed ? `<span data-player-tier ${tier ? "" : "hidden"}>${tierBadge(tier)}</span><input class="in" id="pnm" value="${esc(p.name)}" style="font-weight:800;font-size:17px">` : playerName(pid)}${closeBtn}</h2>
     ${ed ? "" : `<div class="banner" style="margin-bottom:12px">👀 보기 전용이라 바꿀 수 없어요. ⚙️ 설정에서 구글로 로그인하면 바꿀 수 있어요.</div>`}
     <div class="sec ${ed ? "" : "ro-dim"}"><button class="btn block ${p.regular ? "pri" : "ghost"}" data-act="pregular" data-v="${pid}" ${dis}>${p.regular ? "⭐ 고정 참여 (눌러서 해제)" : "☆ 고정 참여로 지정"}</button></div>
     <div class="sec ${ed ? "" : "ro-dim"}"><label>선호 포지션 · 누른 순서가 우선순위예요 (다시 누르면 해제)</label><div class="posbtns">${posBtns}</div>${detailRow}${chosen}</div>
-    <div class="sec ${ed ? "" : "ro-dim"}"><label>평점 (팀 밸런스용 · 별을 누를 때마다 반 별 → 한 별 → 빈 별)</label><div class="stars">${stars}</div></div>
+    <div class="sec"><label>티어</label>${ed ? tierSelect(p) : tierBadge(tier) || `<span class="tier-unset">미지정</span>`}</div>
     <div class="sec"><label>기록</label>
       <div style="font-size:14px;font-weight:700">${s.apps || 0}경기 · ${s.goals || 0}골 · ${s.ast || 0}도움 · ${s.w || 0}승 ${s.d || 0}무 ${s.l || 0}패${s.laundry ? ` · 🧺 빨래 ${s.laundry}회` : ""}</div>${hist}</div>
     ${ed ? `<div class="row"><button class="btn pri" data-act="psave" data-v="${pid}" style="flex:1">이름 저장</button><button class="btn danger" data-act="pdel" data-v="${pid}" data-admin>선수 삭제</button></div>` : ""}`);
@@ -91,7 +81,7 @@ export function redrawGoal() {
   const T = m.teams[d.team], O = m.teams[1 - d.team];
   const list = d.og ? O.players || [] : T.players || [];
   const pick = (act, cur, ids, noneLabel) =>
-    `<div class="pick">${ids.map((id) => `<button class="${cur === id ? "on" : ""}" data-act="${act}" data-v="${id}">${esc(pname(id))}</button>`).join("")}
+    `<div class="pick">${ids.map((id) => `<button class="${cur === id ? "on" : ""}" data-act="${act}" data-v="${id}">${playerName(id)}</button>`).join("")}
       <button class="${cur === null ? "on" : ""}" data-act="${act}" data-v="">${noneLabel}</button></div>`;
 
   openModal(`<h2>${dot(T.color)}${esc(T.name)} 골${closeBtn}</h2>
@@ -138,7 +128,7 @@ export function openAddMatchPlayer(ti) {
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
   openModal(`<h2>${esc(m.teams[ti].name)}에 선수 추가${closeBtn}</h2>
     <form class="row sec" data-act="maddname" data-v="${ti}"><input class="in" name="n" placeholder="새 이름"><button class="btn pri">추가</button></form>
-    <div class="pick">${cands.map((p) => `<button data-act="maddpick" data-v="${ti}:${p.id}">${esc(p.name)}</button>`).join("") || `<span class="hint">추가할 선수가 없어요.</span>`}</div>`);
+    <div class="pick">${cands.map((p) => `<button data-act="maddpick" data-v="${ti}:${p.id}">${playerName(p.id)}</button>`).join("") || `<span class="hint">추가할 선수가 없어요.</span>`}</div>`);
 }
 
 /* ---------- 새 선수 ---------- */
@@ -271,10 +261,10 @@ export function openRoster() {
     ${ed ? `<form class="row" data-act="rosteradd"><input class="in" name="n" placeholder="이름 (여러 명은 쉼표로)" autocomplete="off"><button class="btn pri">추가</button></form>
       <button class="btn kakao block" style="margin-top:8px" data-act="ocr" data-v="roster">📷 카톡 캡처로 명단 만들기</button>` : ""}
     <div class="sec" style="margin-top:14px"><label>고정 참여 ${regs.length}명${ed ? " · 눌러서 빼기" : ""}</label>
-      ${regs.length ? `<div class="chips">${regs.map((p) => `<button class="chip sel" data-act="rostertoggle" data-v="${p.id}" ${ed ? "" : "disabled"}>⭐ ${esc(p.name)}${ed ? `<span class="x">×</span>` : ""}</button>`).join("")}</div>`
+      ${regs.length ? `<div class="chips">${regs.map((p) => `<button class="chip sel" data-act="rostertoggle" data-v="${p.id}" ${ed ? "" : "disabled"}>⭐ ${playerName(p.id)}${ed ? `<span class="x">×</span>` : ""}</button>`).join("")}</div>`
         : `<div class="empty">아직 비어 있어요. 이름을 넣거나 카톡 캡처로 만들어 보세요.</div>`}</div>
     ${others.length ? `<div class="sec"><label>다른 선수${ed ? " · 눌러서 고정 참여로" : ""}</label>
-      <div class="chips">${others.map((p) => `<button class="chip ghost" data-act="rostertoggle" data-v="${p.id}" ${ed ? "" : "disabled"}>+ ${esc(p.name)}</button>`).join("")}</div></div>` : ""}
+      <div class="chips">${others.map((p) => `<button class="chip ghost" data-act="rostertoggle" data-v="${p.id}" ${ed ? "" : "disabled"}>+ ${playerName(p.id)}</button>`).join("")}</div></div>` : ""}
     <button class="btn block" data-act="close">완료</button>`);
 }
 

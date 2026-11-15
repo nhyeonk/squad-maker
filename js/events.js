@@ -3,25 +3,18 @@
 import { S, P, lineup, defaultLineup, mkTeam } from "./state.js";
 import { api, parseConfig, saveCfg, clearCfg, shareLink, login, logout, loginGoogle, setAdmins, loadLocal } from "./store.js";
 import { FORMATIONS } from "./formations.js";
-import { ensurePlayer, findByName, parseNames } from "./players.js";
+import { ensurePlayer, findByName, parseNames, playerTier, TIERS } from "./players.js";
 import { recognizeNames } from "./ocr.js";
-import { locate, removeFrom, movePlayer, autoPlace, relayoutAll, balanceSplit, fillEmpty, teamPlayers, poolList, currentSlots, setSlotLayout, resetSlotLayout, teamSkillSum } from "./lineup.js";
+import { locate, removeFrom, movePlayer, autoPlace, relayoutAll, balanceSplit, fillEmpty, teamPlayers, poolList, currentSlots, setSlotLayout, resetSlotLayout } from "./lineup.js";
 import { roleOfLabel } from "./formations.js";
 import { shortDate, createMatchFromLineup, createBlankMatch, addGoal, removeGoal, addToMatch, removeFromMatch, updateMatchField } from "./matches.js";
 import { lineupText, saveCanvasImage, copyCanvasImage, exportBackup, importBackup, mergeData } from "./share.js";
 import * as M from "./views/modals.js";
 import * as LD from "./views/laundry.js";
+import { tierBadge } from "./views/common.js";
 import { render, commitLineup } from "./render.js";
 import { bindDrag, clickSuppressed, dropSlot, pitchPoint } from "./drag.js";
 import { $, copyText, toast } from "./utils.js";
-
-/** 평점 저장 (0 ~ 5, 0.5 단위) */
-async function setSkill(pid, v) {
-  const skill = Math.max(0, Math.min(5, Math.round(v * 2) / 2));
-  await api.putPlayer({ ...P(pid), skill });
-  M.openPlayer(pid);
-  render();
-}
 
 /** 보기 전용일 때 왜 안 되는지 */
 function viewOnlyReason() {
@@ -36,7 +29,7 @@ const ADMIN_ONLY = new Set(["delmatch", "pdel", "bulkstart", "bulkdelete", "impo
 const EDIT_ONLY = new Set([
   "tobench", "toteam", "topool", "attend", "unattend", "split", "fill", "clearteam", "resetall", "addteam", "delteam",
   "autoplace", "startmatch", "newmatch", "goal", "delgoal", "mstatus", "delmatch", "mrmplayer", "maddplayer",
-  "posopen", "posset", "posreset", "bulkstart", "bulkdelete", "lsave", "ppos", "pdetail", "pstar", "pstep", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply", "pregular", "attendregulars", "rostertoggle",
+  "posopen", "posset", "posreset", "bulkstart", "bulkdelete", "lsave", "ppos", "pdetail", "psave", "pdel", "newplayer", "upload", "import", "ocr", "ocrapply", "pregular", "attendregulars", "rostertoggle",
 ]);
 
 const actions = {
@@ -132,9 +125,10 @@ const actions = {
   },
   split() {
     if (!balanceSplit()) return toast("참가자를 먼저 추가하세요");
+    S.ui.lineupMembersOpen = false;
     commitLineup();
-    const sums = lineup().teams.map((T) => `${T.name} ★${teamSkillSum(T).toFixed(1)}`).join(" · ");
-    toast(`공정하게 나눴어요 — ${sums}`);
+    if (matchMedia("(max-width:860px)").matches) $("#lineup-result")?.scrollIntoView({ block: "start" });
+    toast(`티어와 포지션을 기준으로 ${lineup().teams.length}팀으로 나눴어요`);
   },
   fill() {
     if (!fillEmpty(S.ui.team)) return toast("대기 명단이 비어 있어요");
@@ -377,22 +371,6 @@ const actions = {
     commitLineup();
     toast(`고정 참여 ${ids.length}명 추가했어요`);
   },
-  /* 평점: 별을 누를 때마다 빈 별 → 반 별 → 꽉 찬 별 → 빈 별 */
-  async pstar(v) {
-    const [pid, n] = v.split(":").map((x, i) => (i ? +x : x));
-    const cur = P(pid).skill ?? 3;
-    let next;
-    if (cur < n - 0.5) next = n - 0.5; // 빈 별 → 반 별
-    else if (cur === n - 0.5) next = n; // 반 별 → 꽉 찬 별
-    else if (cur === n) next = n - 1; // 꽉 찬 별 → 빈 별
-    else next = n; // 뒤쪽 별까지 차 있으면 이 별까지로 줄이기
-    await setSkill(pid, next);
-  },
-  /* 평점 − / + : 0.5씩 */
-  async pstep(v) {
-    const [pid, d] = v.split(":");
-    await setSkill(pid, (P(pid).skill ?? 3) + +d);
-  },
   async psave(v) {
     const n = $("#pnm").value.trim();
     if (!n) return;
@@ -507,6 +485,10 @@ const actions = {
   },
   sort(v) {
     S.ui.sort = v;
+    render();
+  },
+  tierfilter(v) {
+    S.ui.tierFilter = S.ui.tierFilter === v ? "all" : v;
     render();
   },
   period(v) {
@@ -641,6 +623,23 @@ const forms = {
 
 /* ----- 값 변경 (select, input) ----- */
 const changes = {
+  async ptier(el) {
+    const pid = el.dataset.v;
+    const tier = el.value;
+    if (!P(pid) || (tier && !Object.hasOwn(TIERS, tier)) || playerTier(P(pid)) === tier) return;
+    const badge = el.closest(".modal")?.querySelector("[data-player-tier]");
+    const refresh = () => {
+      if (badge?.isConnected) {
+        el.value = playerTier(P(pid));
+        badge.innerHTML = tierBadge(el.value);
+        badge.hidden = !el.value;
+      }
+      render();
+    };
+    const saved = api.putPlayerTier(pid, tier || null);
+    refresh();
+    if (!(await saved)) refresh();
+  },
   size(el) {
     const l = lineup();
     l.size = +el.value;
@@ -667,6 +666,7 @@ const changes = {
 export function bindEvents() {
   bindDrag();
   document.addEventListener("click", async (e) => {
+    if (e.target.closest("select[data-chg]")) return; // 표 안 선택 목록은 행 클릭과 별개로 작동해요
     const el = e.target.closest("[data-act]");
     if (!el || el.tagName === "FORM") return;
     if (clickSuppressed()) return; // 방금 끌기를 끝낸 클릭은 무시

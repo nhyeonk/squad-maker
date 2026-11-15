@@ -21,8 +21,10 @@ export function loadLocal() {
 function saveLocal() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ players: S.players, matches: S.matches, lineup: S.lineup }));
+    return true;
   } catch {
     toast("저장 공간이 부족해요");
+    return false;
   }
 }
 
@@ -32,9 +34,11 @@ const ref = (...path) => FB.fs.doc(FB.db, "groups", FB.gid, ...path);
 async function remote(fn) {
   try {
     await fn();
+    return true;
   } catch (e) {
     console.error(e);
     toast(e.code === "permission-denied" ? (S.user ? "관리자만 할 수 있는 작업이에요" : "저장하려면 ⚙️ 설정에서 구글로 로그인하세요") : "저장 실패: " + (e.code || e.message));
+    return false;
   }
 }
 
@@ -44,6 +48,19 @@ export const api = {
     S.players[p.id] = p;
     if (FB) return remote(() => FB.fs.setDoc(ref("players", p.id), plain(p)));
     saveLocal();
+  },
+  async putPlayerTier(id, tier) {
+    const previous = S.players[id];
+    if (!previous) return false;
+    const next = { ...previous, tier };
+    S.players[id] = next;
+    bumpData();
+    const saved = FB ? await remote(() => FB.fs.updateDoc(ref("players", id), { tier })) : saveLocal();
+    if (!saved && S.players[id] === next) {
+      S.players[id] = previous;
+      bumpData();
+    }
+    return saved;
   },
   delPlayer(id) {
     bumpData();
@@ -128,7 +145,7 @@ export function shareLink() {
 
 /* ---------- 로그인 & 권한 ----------
  * 👀 방문자: 로그인 안 함 → 보기만
- * ✏️ 일반 회원: 구글 로그인만 하면 자동 → 골·라인업·팀 나누기·경기 만들기·평점 등
+ * ✏️ 일반 회원: 구글 로그인만 하면 자동 → 골·라인업·팀 나누기·경기 만들기·티어 지정 등
  * 🛡️ 관리자: 최고 관리자가 지정 → + 경기·선수 삭제, 백업 불러오기
  * 👑 최고 관리자: firestore.rules에 적은 이메일 → + 관리자 지정·해제
  * 관리자 명단은 Firestore의 recorders/{그룹ID} 문서: { owner: 최고 관리자 이메일, admins: [관리자 이메일...] }

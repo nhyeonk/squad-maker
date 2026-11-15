@@ -3,6 +3,19 @@ import { S } from "./state.js";
 import { api } from "./store.js";
 import { uid } from "./utils.js";
 
+export const TIERS = {
+  S: { color: "백금", weight: 5 },
+  A: { color: "금", weight: 4 },
+  B: { color: "은", weight: 3 },
+  C: { color: "동", weight: 2 },
+  F: { color: "검정", weight: 1 },
+};
+
+export const playerTier = (p) => typeof p?.tier === "string" && Object.hasOwn(TIERS, p.tier) ? p.tier : "";
+
+/** 미지정 선수는 팀을 나눌 때 중간값인 B와 같은 비중으로 계산해요. */
+export const tierWeight = (p) => TIERS[playerTier(p) || "B"].weight;
+
 export const findByName = (name) => Object.values(S.players).find((p) => p.name === name.trim());
 
 /** 이름으로 선수를 찾고, 없으면 새로 만들어요 (같은 이름 = 같은 선수) */
@@ -11,7 +24,7 @@ export function ensurePlayer(name) {
   if (!name) return null;
   let p = findByName(name);
   if (!p) {
-    p = { id: uid(), name, pos: [], skill: 3, createdAt: Date.now() };
+    p = { id: uid(), name, pos: [], createdAt: Date.now() };
     api.putPlayer(p);
   }
   return p;

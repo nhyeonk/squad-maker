@@ -3,20 +3,60 @@
 // 2) 대기 명단·후보·팀 명단의 선수 이름: 경기장이나 다른 곳으로 끌어오기 (폰은 살짝 길게 눌러서)
 import { S, P, lineup } from "./state.js";
 import { movePlayer, currentSlots, setSlotLayout } from "./lineup.js";
-import { nearestLabel } from "./formations.js";
+import { roleOfLabel } from "./formations.js";
+import { clampFieldPosition, pitchDistance, pitchZoneAt, PITCH_ZONES } from "./pitch-zones.js";
 import { render, commitLineup } from "./render.js";
 
 /* ---------- 경기장: 끌어서 옮기기 / 빈 잔디 눌러서 옮기기 ---------- */
 const clamp = (v) => Math.max(4, Math.min(96, v));
-export function pitchPoint(e) {
+export function pitchPoint(e, offset) {
   const r = document.getElementById("pitch").getBoundingClientRect();
-  return { x: clamp(((e.clientX - r.left) / r.width) * 100), y: clamp(((e.clientY - r.top) / r.height) * 100) };
+  return {
+    x: clamp(((e.clientX - r.left) / r.width) * 100 - (offset?.x ?? 0)),
+    y: clamp(((e.clientY - r.top) / r.height) * 100 - (offset?.y ?? 0)),
+  };
 }
-/** 자리를 (x,y)로 옮기기. 다른 자리 가까이 놓으면 그 자리 선수와 맞교환 */
-export function dropSlot(slotIdx, pt) {
+
+function pitchDropAt(point, { skip = -1, previous, goalkeeper = false, fallback = false } = {}) {
   const t = S.ui.team;
   const slots = currentSlots(t);
-  const near = slots.findIndex((s, i) => i !== slotIdx && Math.hypot(s.x - pt.x, (s.y - pt.y) * 0.68) < 6);
+  const T = lineup().teams[t];
+  const targets = slots.map((slot, i) => ({ i, slot, distance: pitchDistance(slot, point) }))
+    .filter(({ i }) => i !== skip && (i !== 0 || goalkeeper))
+    .sort((a, b) => a.distance - b.distance);
+  const occupied = new Set(targets.map(({ slot }) => slot.label));
+  const zone = pitchZoneAt(point, { previous, goalkeeper, occupied, fallback });
+  const nearby = targets[0]?.distance <= 30 ? targets[0] : null;
+  const destination = nearby || (zone && targets.find(({ i, slot }) => T.slots[i] && slot.label === zone.label));
+  if (destination) {
+    const label = destination.slot.label;
+    return { zone: PITCH_ZONES[label] ?? zone, label, slotIdx: destination.i };
+  }
+  if (goalkeeper && zone?.label === "GK") return { zone, label: "GK", slotIdx: 0 };
+  return { zone, label: zone?.label, slotIdx: -1 };
+}
+
+function showPitchZone(zone) {
+  const polygon = document.querySelector("[data-position-zone]");
+  if (!polygon) return;
+  if (zone) {
+    polygon.setAttribute("points", zone.points);
+    polygon.setAttribute("data-position-zone", zone.label);
+  }
+  polygon.parentElement.toggleAttribute("hidden", !zone);
+}
+
+function savePitchPosition(team, slot, point, label) {
+  setSlotLayout(team, slot, { x: Math.round(point.x * 10) / 10, y: Math.round(point.y * 10) / 10, label });
+}
+
+/** 자리를 옮기거나, 가리킨 포지션의 선수와 맞교환해요. */
+export function dropSlot(slotIdx, pt, previous) {
+  if (slotIdx === 0) return; // GK 자리는 고정, 선수 교체는 슬롯 선택으로 가능
+  const t = S.ui.team;
+  const point = clampFieldPosition(pt);
+  const target = pitchDropAt(point, { skip: slotIdx, previous, fallback: true });
+  const near = target.slotIdx;
   const T = lineup().teams[t];
   if (near >= 0) {
     // 자리끼리 선수 맞교환
@@ -24,7 +64,7 @@ export function dropSlot(slotIdx, pt) {
     if (b) T.slots[slotIdx] = b; else delete T.slots[slotIdx];
     if (a) T.slots[near] = a; else delete T.slots[near];
   } else {
-    setSlotLayout(t, slotIdx, { x: Math.round(pt.x * 10) / 10, y: Math.round(pt.y * 10) / 10, label: nearestLabel(pt.x, pt.y) });
+    savePitchPosition(t, slotIdx, point, target.label);
   }
   commitLineup();
 }
@@ -66,8 +106,14 @@ function bindPitchDrag() {
   document.addEventListener("pointerdown", (e) => {
     const el = e.target.closest("[data-drag]");
     if (!el || !S.canEdit || e.button > 0) return;
-    const pid = lineup().teams[S.ui.team].slots[+el.dataset.drag] || null;
-    drag = { el, idx: +el.dataset.drag, pid, sx: e.clientX, sy: e.clientY, moving: false, id: e.pointerId, ox: el.style.left, oy: el.style.top };
+    const idx = +el.dataset.drag;
+    if (idx === 0) return;
+    const pid = lineup().teams[S.ui.team].slots[idx] || null;
+    const slot = currentSlots()[idx];
+    const start = pitchPoint(e);
+    const offset = { x: start.x - slot.x, y: start.y - slot.y };
+    drag = { el, idx, pid, sx: e.clientX, sy: e.clientY, moving: false, id: e.pointerId,
+      ox: el.style.left, oy: el.style.top, offset, previous: slot.label };
   });
   document.addEventListener("pointermove", (e) => {
     if (!drag || e.pointerId !== drag.id) return;
@@ -88,13 +134,21 @@ function bindPitchDrag() {
       drag.ghost = null;
       drag.el.classList.remove("faded");
       markDropOver(null);
-      const pt = pitchPoint(e);
+      const pt = pitchPoint(e, drag.offset);
       drag.el.style.left = pt.x + "%";
       drag.el.style.top = pt.y + "%";
-      const lab = drag.el.querySelector(".rl") || drag.el.querySelector(".cir");
-      if (lab) lab.textContent = nearestLabel(pt.x, pt.y);
+      const target = pitchDropAt(pt, { skip: drag.idx, previous: drag.previous });
+      drag.previous = target.label;
+      showPitchZone(target.zone);
+      const circle = drag.el.querySelector(".cir");
+      if (circle && target.label) {
+        const label = circle.querySelector(".rl") || circle;
+        label.textContent = target.label;
+        circle.className = `cir role-${roleOfLabel(target.label)}`;
+      }
     } else {
       // 경기장 밖: 이름표가 따라오고, 동그라미는 제자리에 흐리게
+      showPitchZone(null);
       if (!drag.ghost) {
         drag.ghost = document.createElement("div");
         drag.ghost.className = "dragghost";
@@ -118,13 +172,14 @@ function bindPitchDrag() {
     setTimeout(() => (suppressClick = false), 60);
     document.body.classList.remove("pdragging");
     markDropOver(null);
+    showPitchZone(null);
     if (d.ghost) {
       const under = dropTargetAt(e, d.ghost);
       d.ghost.remove();
       if (dropOutside(d.pid, under)) return commitLineup();
       return render(); // 놓을 곳이 아니면 제자리로
     }
-    dropSlot(d.idx, pitchPoint(e));
+    dropSlot(d.idx, pitchPoint(e, d.offset), d.previous);
   };
   document.addEventListener("pointerup", end);
   document.addEventListener("pointercancel", (e) => {
@@ -143,16 +198,19 @@ function dropPlayerOnPitch(pid, pt) {
   const t = S.ui.team;
   const T = lineup().teams[t];
   const slots = currentSlots(t);
-  const dist = (s) => Math.hypot(s.x - pt.x, (s.y - pt.y) * 0.68);
-  const hit = slots.findIndex((s) => dist(s) < 6); // 동그라미 바로 위
-  if (hit >= 0) return movePlayer(pid, { kind: "slot", team: t, slot: hit });
-  const empty = slots.map((s, i) => i).filter((i) => !T.slots[i]);
+  const point = clampFieldPosition(pt);
+  const target = pitchDropAt(pt, { goalkeeper: true });
+  if (target.slotIdx >= 0) return movePlayer(pid, { kind: "slot", team: t, slot: target.slotIdx });
+  const label = target.label || pitchDropAt(point, { fallback: true }).label;
+  const dist = (s) => pitchDistance(s, point);
+  const outfield = slots.map((_, i) => i).slice(1);
+  const empty = outfield.filter((i) => !T.slots[i]);
   if (empty.length) {
     const i = empty.sort((a, b) => dist(slots[a]) - dist(slots[b]))[0];
     movePlayer(pid, { kind: "slot", team: t, slot: i });
-    setSlotLayout(t, i, { x: Math.round(pt.x * 10) / 10, y: Math.round(pt.y * 10) / 10, label: nearestLabel(pt.x, pt.y) });
+    savePitchPosition(t, i, point, label);
   } else {
-    const i = slots.map((s, k) => k).sort((a, b) => dist(slots[a]) - dist(slots[b]))[0];
+    const i = outfield.sort((a, b) => dist(slots[a]) - dist(slots[b]))[0];
     movePlayer(pid, { kind: "slot", team: t, slot: i });
   }
 }
@@ -178,7 +236,15 @@ function bindPlayerDrag() {
     pdrag.ghost.style.display = "none";
     const under = document.elementFromPoint(e.clientX, e.clientY);
     pdrag.ghost.style.display = "";
-    under?.closest("[data-drop], #pitch, [data-pdrag]")?.classList.add("dropover");
+    if (under?.closest("#pitch")) {
+      const slot = under.closest("[data-drag]");
+      const label = slot && currentSlots()[+slot.dataset.drag]?.label;
+      const pt = pitchPoint(e);
+      showPitchZone(PITCH_ZONES[label] ?? pitchDropAt(pt, { goalkeeper: true }).zone);
+    } else {
+      showPitchZone(null);
+      under?.closest("[data-drop], [data-pdrag]")?.classList.add("dropover");
+    }
   };
   const finish = (e) => {
     const d = pdrag;
@@ -188,6 +254,7 @@ function bindPlayerDrag() {
     d.ghost.remove();
     document.body.classList.remove("pdragging");
     document.querySelectorAll(".dropover").forEach((el) => el.classList.remove("dropover"));
+    showPitchZone(null);
     suppressClick = true;
     setTimeout(() => (suppressClick = false), 60);
     const under = document.elementFromPoint(e.clientX, e.clientY);

@@ -2,7 +2,7 @@
 import { S, pname } from "../state.js";
 import { scoreOf } from "../stats.js";
 import { esc, fmtDate } from "../utils.js";
-import { dot } from "./common.js";
+import { dot, playerName } from "./common.js";
 
 const statusChip = (m) => `<span class="status ${m.status === "done" ? "done" : ""}">${m.status === "done" ? "종료" : "진행 중"}</span>`;
 
@@ -68,7 +68,7 @@ export function viewMatch(m) {
     <div class="chips">${(T.players || [])
       .map((pid) => {
         const r = T.roles?.[pid];
-        return `<span class="chip">${esc(pname(pid))}${r && r !== "SUB" ? ` <span class="pb ${r}">${r}</span>` : ""}${ed ? `<button class="x" data-act="mrmplayer" data-v="${ti}:${pid}">×</button>` : ""}</span>`;
+        return `<span class="chip">${playerName(pid)}${r && r !== "SUB" ? ` <span class="pb ${r}">${r}</span>` : ""}${ed ? `<button class="x" data-act="mrmplayer" data-v="${ti}:${pid}">×</button>` : ""}</span>`;
       })
       .join("")}
     ${ed ? `<button class="chip add" data-act="maddplayer" data-v="${ti}">+ 추가</button>` : ""}</div></div>`;
