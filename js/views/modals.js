@@ -1,7 +1,7 @@
 // 팝업 창들: 선수 정보, 골 입력, 경기 시작, 출전 선수 추가, 설정
 import { S, P, pname, lineup } from "../state.js";
 import { POS, POS_KO, POSITION_GROUPS, PREF_DETAIL } from "../formations.js";
-import { playerTier } from "../players.js";
+import { playerTier, showViewTiers } from "../players.js";
 import { computeStats, scoreOf } from "../stats.js";
 import { teamPlayers, currentSlots } from "../lineup.js";
 import { renderSquadCanvas } from "../share.js";
@@ -60,11 +60,11 @@ export function openPlayer(pid) {
   const chosen = shown.length ? `<div class="pchosen">선호: ${shown.map(([t, r]) => `<span class="pb ${r}">${t}</span>`).join(" ")}</div>` : "";
   const tier = playerTier(p);
 
-  openModal(`<h2>${ed ? `<span data-player-tier ${tier ? "" : "hidden"}>${tierBadge(tier)}</span><input class="in" id="pnm" value="${esc(p.name)}" style="font-weight:800;font-size:17px">` : playerName(pid)}${closeBtn}</h2>
+  openModal(`<h2>${ed ? `${showViewTiers() ? `<span data-player-tier ${tier ? "" : "hidden"}>${tierBadge(tier)}</span>` : ""}<input class="in" id="pnm" value="${esc(p.name)}" style="font-weight:800;font-size:17px">` : playerName(pid)}${closeBtn}</h2>
     ${ed ? "" : `<div class="banner" style="margin-bottom:12px">👀 보기 전용이라 바꿀 수 없어요. ⚙️ 설정에서 구글로 로그인하면 바꿀 수 있어요.</div>`}
     <div class="sec ${ed ? "" : "ro-dim"}"><button class="btn block ${p.regular ? "pri" : "ghost"}" data-act="pregular" data-v="${pid}" ${dis}>${p.regular ? "⭐ 고정 참여 (눌러서 해제)" : "☆ 고정 참여로 지정"}</button></div>
     <div class="sec ${ed ? "" : "ro-dim"}"><label>선호 포지션 · 누른 순서가 우선순위예요 (다시 누르면 해제)</label><div class="posbtns">${posBtns}</div>${detailRow}${chosen}</div>
-    <div class="sec"><label>티어</label>${ed ? tierSelect(p) : tierBadge(tier) || `<span class="tier-unset">미지정</span>`}</div>
+    ${showViewTiers() ? `<div class="sec"><label>티어</label>${tierSelect(p)}</div>` : ""}
     <div class="sec"><label>기록</label>
       <div style="font-size:14px;font-weight:700">${s.apps || 0}경기 · ${s.goals || 0}골 · ${s.ast || 0}도움 · ${s.w || 0}승 ${s.d || 0}무 ${s.l || 0}패${s.laundry ? ` · 🧺 빨래 ${s.laundry}회` : ""}</div>${hist}</div>
     ${ed ? `<div class="row"><button class="btn pri" data-act="psave" data-v="${pid}" style="flex:1">이름 저장</button><button class="btn danger" data-act="pdel" data-v="${pid}" data-admin>선수 삭제</button></div>` : ""}`);
@@ -151,7 +151,6 @@ export function openSettings() {
       <div class="sec"><label>친구 초대</label><button class="btn pri block" data-act="share">🔗 공유 링크 복사</button>
         <p class="hint">이 링크를 단톡방에 올리면 누구나 로그인 없이 실시간으로 볼 수 있어요.</p></div>
       ${accountSection()}
-      ${S.isOwner ? adminsSection() : ""}
       ${S.isAdmin ? `<div class="sec"><label>이 폰의 예전 기록 올리기</label><button class="btn block" data-act="upload">이 폰에 저장된 기록을 서버로 합치기</button></div>` : ""}
       <div class="sec"><label>그룹 ID</label><code>${esc(groupId())}</code></div>
       <button class="btn danger block" data-act="disconnect">서버 연결 해제 (이 폰만)</button>${backup}`), (S.ui.settingsOpen = true);
@@ -217,37 +216,11 @@ function accountSection() {
       <p class="hint">구글로 로그인하면 바로 <b>골·라인업·팀 나누기</b>를 기록할 수 있어요. 로그인 안 하면 보기만 돼요.</p></div>`;
   }
   const email = esc(S.user.email || "");
-  const role = !S.rolesLoaded
-    ? `<p class="hint">권한 확인 중…</p>`
-    : S.isOwner
-      ? `<p class="hint">👑 <b>최고 관리자</b>예요. 아래에서 관리자를 지정할 수 있어요.</p>`
-      : S.isAdmin
-        ? `<p class="hint">🛡️ <b>관리자</b>예요. 경기·선수 삭제와 백업 불러오기도 할 수 있어요.</p>`
+  const role = S.isAdmin
+        ? `<p class="hint">🛡️ <b>관리자</b>예요. 티어 관리, 경기·선수 삭제와 백업 불러오기를 할 수 있어요.</p>`
         : `<p class="hint">✏️ <b>일반 회원</b>이에요. 골·라인업·팀 나누기를 기록할 수 있어요. (경기·선수 삭제는 관리자만)</p>`;
   return `<div class="sec"><label>내 계정 <span class="badge">${email}</span></label>${role}
     <button class="btn block" style="margin-top:8px" data-act="logout">로그아웃</button></div>`;
-}
-
-/** "skawlgus6216@gmail.com" → "ska***16@gmail.com" */
-export function maskEmail(e = "") {
-  const [id, domain] = e.split("@");
-  if (!domain) return e;
-  const shown = id.length <= 4 ? id.slice(0, 1) + "***" : id.slice(0, 3) + "***" + id.slice(-2);
-  return `${shown}@${domain}`;
-}
-
-function adminsSection() {
-  const list = S.roles?.admins || [];
-  const open = S.ui.recordersOpen ? "open" : "";
-  return `<div class="sec"><details class="recbox" ${open} data-act-toggle="recordersOpen">
-    <summary><span>🛡️ 관리자 <b>${list.length + 1}명</b> · 관리</span><span class="chev">›</span></summary>
-    <div class="reclist">
-      <div class="recrow"><span>👑 ${esc(maskEmail(S.roles?.owner || ""))}</span><span class="rectag">최고 관리자</span></div>
-      ${list.map((e) => `<div class="recrow"><span title="${esc(e)}">${esc(maskEmail(e))}</span><button class="recdel" data-act="recdel" data-v="${esc(e)}" aria-label="해제">×</button></div>`).join("")}
-    </div>
-    <form class="row" data-act="recadd" style="margin-top:10px"><input class="in" name="n" type="email" placeholder="관리자로 지정할 구글 이메일"><button class="btn pri">추가</button></form>
-    <p class="hint">관리자는 경기·선수 삭제, 백업 불러오기를 할 수 있어요. 나머지 사람은 로그인만 하면 일반 회원이에요.</p>
-  </details></div>`;
 }
 
 /* ---------- 고정 참여 명단 ---------- */

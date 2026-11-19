@@ -11,7 +11,6 @@ import { layoutPitchMarkers } from "./pitch-markers.js";
 function renderChrome() {
   const sync = $("#sync");
   if (S.mode === "local") [sync.className, sync.textContent] = ["sync", "이 폰에만 저장"];
-  else if (S.isOwner) [sync.className, sync.textContent] = ["sync live", "● 실시간 · 👑 관리자"];
   else if (S.isAdmin) [sync.className, sync.textContent] = ["sync live", "● 실시간 · 🛡️ 관리자"];
   else if (S.canEdit) [sync.className, sync.textContent] = ["sync live", "● 실시간 · 회원"];
   else [sync.className, sync.textContent] = ["sync ro", "● 실시간 · 보기 전용"];
@@ -36,8 +35,10 @@ function renderChrome() {
 export function render() {
   renderChrome();
   const app = $("#app");
-  if (S.mode === "remote" && !S.ready) {
-    app.innerHTML = `<div class="card empty">기록을 불러오는 중…</div>`;
+  if (S.mode === "remote" && (!S.ready || !S.directoryReady)) {
+    app.innerHTML = `<div class="card empty">${S.ready ? "관리자가 로그인하면 기존 선수 명단을 준비해요." : "기록을 불러오는 중…"}</div>`;
+    $("#selbar").innerHTML = "";
+    if (S.ui.settingsOpen) openSettings();
     layoutPitchMarkers(null);
     return;
   }

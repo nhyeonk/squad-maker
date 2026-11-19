@@ -6,6 +6,9 @@ import { bindEvents } from "./events.js";
 import { toast } from "./utils.js";
 import { APP_VERSION } from "./config.js";
 
+hooks.closePrivateViews = () => {
+  document.getElementById("modal").replaceChildren();
+};
 hooks.render = render;
 hooks.scheduleRender = scheduleRender;
 bindEvents();

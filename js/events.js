@@ -1,7 +1,7 @@
 // 버튼·입력 이벤트 처리
 // HTML의 data-act="이름" 버튼을 누르면 아래 actions["이름"]이 실행돼요. (data-v 값이 v로 들어와요)
 import { S, P, lineup, defaultLineup, addLineupTeam, MIN_LINEUP_TEAMS } from "./state.js";
-import { api, parseConfig, saveCfg, clearCfg, shareLink, login, logout, loginGoogle, setAdmins, loadLocal } from "./store.js";
+import { api, parseConfig, saveCfg, clearCfg, shareLink, login, logout, loginGoogle, loadLocal } from "./store.js";
 import { FORMATIONS } from "./formations.js";
 import { ensurePlayer, findByName, parseNames, playerTier, TIERS } from "./players.js";
 import { recognizeNames } from "./ocr.js";
@@ -24,7 +24,7 @@ function viewOnlyReason() {
 }
 
 /* 관리자만 할 수 있는 동작 (서버 규칙으로도 막혀 있어요) */
-const ADMIN_ONLY = new Set(["delmatch", "pdel", "bulkstart", "bulkdelete", "import", "upload"]);
+const ADMIN_ONLY = new Set(["delmatch", "pdel", "bulkstart", "bulkdelete", "import", "upload", "toggleSquadTiers", "tierfilter"]);
 
 /* 보기 전용일 때 막을 동작 */
 const EDIT_ONLY = new Set([
@@ -130,7 +130,7 @@ const actions = {
     S.ui.lineupMemberQuery = "";
     commitLineup();
     if (matchMedia("(max-width:860px)").matches) $("#lineup-result")?.scrollIntoView({ block: "start" });
-    toast(`티어와 포지션을 기준으로 ${lineup().teams.length}팀으로 나눴어요`);
+    toast(`${lineup().teams.length}팀으로 나눴어요`);
   },
   fill() {
     if (!fillEmpty(S.ui.team)) return toast("대기 명단이 비어 있어요");
@@ -487,7 +487,14 @@ const actions = {
     render();
     toast(`${ids.length}명 삭제했어요`);
   },
+  toggleSquadTiers() {
+    S.ui.hideSquadTiers = !S.ui.hideSquadTiers;
+    try { localStorage.setItem("squadmaker_hide_tiers", S.ui.hideSquadTiers ? "1" : "0"); } catch {}
+    render();
+    document.querySelector('[data-act="toggleSquadTiers"]')?.focus({ preventScroll: true });
+  },
   sort(v) {
+    if (v === "tier" && !S.isAdmin) return;
     S.ui.sort = v;
     render();
   },
@@ -535,11 +542,6 @@ const actions = {
       console.error(e);
       toast(e.code === "auth/unauthorized-domain" ? "이 주소가 Firebase 승인된 도메인에 없어요 (README 참고)" : e.code === "auth/popup-closed-by-user" ? "로그인을 취소했어요" : "로그인 실패: " + (e.code || e.message));
     }
-  },
-  async recdel(v) {
-    if (!confirm(`${M.maskEmail(v)}을(를) 관리자에서 해제할까요? (일반 회원이 돼요)`)) return;
-    await setAdmins((S.roles?.admins || []).filter((x) => x !== v)).catch((e) => toast("실패: " + e.code));
-    M.openSettings();
   },
   async upload() {
     const d = loadLocal();
@@ -602,18 +604,6 @@ const forms = {
     render();
     setTimeout(() => $('form[data-act="rosteradd"] input')?.focus(), 30);
   },
-  async recadd(f) {
-    const email = f.n.value.trim().toLowerCase();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast("이메일 형식을 확인하세요");
-    try {
-      await setAdmins([...(S.roles?.admins || []), email]);
-      toast("관리자로 지정했어요");
-      S.ui.recordersOpen = true;
-      M.openSettings();
-    } catch (e) {
-      toast("실패: " + (e.code || e.message));
-    }
-  },
   async login(f) {
     try {
       await login(f.e.value.trim(), f.p.value);
@@ -628,6 +618,7 @@ const forms = {
 /* ----- 값 변경 (select, input) ----- */
 const changes = {
   async ptier(el) {
+    if (!S.isAdmin) return;
     const pid = el.dataset.v;
     const tier = el.value;
     if (!P(pid) || (tier && !Object.hasOwn(TIERS, tier)) || playerTier(P(pid)) === tier) return;
@@ -699,7 +690,6 @@ export function bindEvents() {
     const fn = forms[f.dataset.act];
     if (!fn) return;
     if (f.dataset.act !== "login" && !S.canEdit) return toast(viewOnlyReason());
-    if (f.dataset.act === "recadd" && !S.isOwner) return toast("최고 관리자만 할 수 있어요");
     await fn(f);
     if (f.n) f.n.value = "";
   });

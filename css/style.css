@@ -388,3 +388,6 @@ body.pdragging [data-drop],body.pdragging #pitch{outline:2px dashed rgba(224,168
 .lprize.hit{background:#fff1d6;border-color:#f0b400;color:#1d1d1b;font-size:16px}
 .lprize.miss{opacity:.6}
 .lcard b{font-size:15px}
+
+.squad-tier-toggle { margin: 0 0 10px; min-height: 40px; }
+.squad-tier-toggle[aria-pressed="true"] { color: #216749; border-color: currentColor; }

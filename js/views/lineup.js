@@ -2,7 +2,7 @@
 import { S, P, lineup, MIN_LINEUP_TEAMS, MAX_LINEUP_TEAMS } from "../state.js";
 import { FORMATIONS, FUTSAL_MAX } from "../formations.js";
 import { currentSlots, teamPlayers, poolList, locate } from "../lineup.js";
-import { TIERS, matchesPlayerName, playerTier } from "../players.js";
+import { TIERS, matchesPlayerName, playerTier, showSquadTiers } from "../players.js";
 import { pitchPosition, PITCH_TOUCHLINE, PITCH_ZONES } from "../pitch-zones.js";
 import { esc } from "../utils.js";
 import { attendanceCounts, computeStats } from "../stats.js";
@@ -150,7 +150,7 @@ function poolCard(l) {
       <button class="btn" data-act="clearteam">이 팀 비우기</button>
       <button class="btn" data-act="resetall">전체 초기화</button>
     </div>
-    <p class="hint" data-edit>선수를 <b>끌어서</b> 경기장·후보·팀 명단으로 옮길 수 있어요. 폰에서는 살짝 길게 눌렀다가 끌어요. 밸런스 나누기는 <b>티어와 선호 포지션</b>을 고려해요. 티어 미지정 선수는 B와 같은 비중으로 계산해요.</p>
+    <p class="hint" data-edit>선수를 <b>끌어서</b> 경기장·후보·팀 명단으로 옮길 수 있어요. 폰에서는 살짝 길게 눌렀다가 끌어요. ${showSquadTiers() ? "밸런스 나누기는 티어와 선호 포지션을 고려해요." : ""}</p>
   </div>`;
 }
 
@@ -160,7 +160,8 @@ function teamsCard(l, t) {
   const tierRank = (id) => TIERS[playerTier(P(id))]?.weight ?? 0;
   const cards = l.teams
     .map((x, i) => {
-      const ids = teamPlayers(x).filter(P).sort((a, b) => tierRank(b) - tierRank(a));
+      const ids = teamPlayers(x).filter(P);
+      if (showSquadTiers()) ids.sort((a, b) => tierRank(b) - tierRank(a));
       const active = i === t;
       const canDrop = sel && selLoc && !(selLoc.kind !== "pool" && selLoc.team === i);
       const action = canDrop
@@ -228,6 +229,7 @@ export function viewLineup() {
         <select class="in" data-chg="badge">${BADGES.map(([k, t]) => `<option value="${k}" ${S.ui.badge === k ? "selected" : ""}>${t}</option>`).join("")}</select></label>
       <button class="iconbtn lineup-autoplace" data-act="autoplace" aria-label="선호 포지션대로 다시 배치" title="선호 포지션대로 다시 배치" data-edit><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12a9 9 0 109-9 9.7 9.7 0 00-6.7 2.8L3 8"/><path d="M3 3v5h5"/></svg><span>다시 배치</span></button>
     </div>
+    ${S.isAdmin ? `<button type="button" class="btn sm squad-tier-toggle" data-act="toggleSquadTiers" aria-pressed="${S.ui.hideSquadTiers}">${S.ui.hideSquadTiers ? "티어 표시하기" : "티어 숨기기"}</button>` : ""}
     <div class="pitchwrap">${pitch(l, T, slots)}${side(l, T)}</div>
     <div class="legend"><span><i style="border-color:var(--fw)"></i>FW</span><span><i style="border-color:var(--mf)"></i>MF</span><span><i style="border-color:var(--df)"></i>DF</span><span><i style="border-color:var(--gk)"></i>GK</span></div>
     <p class="hint" data-edit>선수를 <b>끌면 초록색으로 표시되는 구역</b>이 새 포지션이에요. 그 자리에 선수가 있으면 서로 바뀌어요. 골키퍼 자리는 고정이고, 선수를 선택한 뒤 GK 자리를 눌러 교체할 수 있어요.</p>

@@ -47,10 +47,10 @@ function tierTable(filter) {
 
 export function viewPlayers() {
   const { st, games, goals } = computeStats(S.ui.period);
-  const key = S.ui.sort;
+  const key = !S.isAdmin && S.ui.sort === "tier" ? "goals" : S.ui.sort;
   const val = sortValue[key];
-  const bulk = S.ui.bulk && S.canEdit;
-  const filter = bulk ? "all" : S.ui.tierFilter;
+  const bulk = S.ui.bulk && S.isAdmin;
+  const filter = bulk || !S.isAdmin ? "all" : S.ui.tierFilter;
   const rows = Object.values(st)
     .filter((s) => P(s.id) && (filter === "all" || playerTier(P(s.id)) === filter))
     .sort((a, b) => val(b) - val(a) || b.goals - a.goals || b.ast - a.ast || pname(a.id).localeCompare(pname(b.id), "ko"));
@@ -68,7 +68,7 @@ export function viewPlayers() {
       const tier = S.canEdit && !bulk ? tierSelect(pl) : tierBadge(playerTier(pl)) || `<span class="tier-unset">미지정</span>`;
       return `<tr class="click ${bulk && picked.has(s.id) ? "picked" : ""}" data-act="${bulk ? "bulktoggle" : "info"}" data-v="${s.id}">
         <td>${first}</td><td class="player-col">${playerName(s.id)}</td>
-        <td>${tier}</td>
+        ${S.isAdmin ? `<td>${tier}</td>` : ""}
         <td>${rp ? `<span class="pb ${rp}" style="font-size:11px;padding:2px 7px">${POS_KO[rp]}</span>` : "-"}</td>
         <td>${prefs || `<span style="color:var(--mute)">-</span>`}</td>
         <td>${s.apps || "-"}</td><td>${dec ? `${s.w}-${s.d}-${s.l}` : "-"}</td><td>${dec ? Math.round((s.w / dec) * 100) + "%" : "-"}</td>
@@ -85,15 +85,15 @@ export function viewPlayers() {
       <div class="stat"><b>${games}</b><span>경기</span></div>
       <div class="stat"><b>${goals}</b><span>골</span></div>
       <div class="stat"><b>${Object.keys(S.players).length}</b><span>선수</span></div></div>
-    ${bulk ? "" : tierTable(filter)}
-    <div class="row" style="flex-wrap:wrap;margin-bottom:10px">${seg(SORTS, key, "sort")}${seg(PERIODS, S.ui.period, "period")}<span style="flex:1"></span>
+    ${S.isAdmin && !bulk ? tierTable(filter) : ""}
+    <div class="row" style="flex-wrap:wrap;margin-bottom:10px">${seg(SORTS.filter(([k]) => k !== "tier" || S.isAdmin), key, "sort")}${seg(PERIODS, S.ui.period, "period")}<span style="flex:1"></span>
       ${bulk ? "" : `<button class="btn sm" data-act="bulkstart" data-admin>여러 명 삭제</button><button class="btn sm pri" data-act="newplayer" data-edit>+ 선수 추가</button>`}</div>
     ${bulk ? `<div class="bulkbar"><span><b>${picked.size}명</b> 선택</span><span class="sp"></span>
       <button class="btn sm ghost" data-act="bulkall">${picked.size === rows.length ? "선택 해제" : "전체 선택"}</button>
       <button class="btn sm ghost" data-act="bulkcancel">취소</button>
       <button class="btn sm red" data-act="bulkdelete" ${picked.size ? "" : "disabled"}>${picked.size}명 삭제</button></div>` : ""}
     ${rows.length
-      ? `<div class="tbw"><table class="tb"><thead><tr><th>No</th><th class="player-col" scope="col">이름</th><th>티어</th><th>추천 포지션</th><th>선호</th><th>경기</th><th>승-무-패</th><th>승률</th><th>골</th><th>도움</th><th>공격P</th></tr></thead><tbody>${tr}</tbody></table></div>`
+      ? `<div class="tbw"><table class="tb"><thead><tr><th>No</th><th class="player-col" scope="col">이름</th>${S.isAdmin ? "<th>티어</th>" : ""}<th>추천 포지션</th><th>선호</th><th>경기</th><th>승-무-패</th><th>승률</th><th>골</th><th>도움</th><th>공격P</th></tr></thead><tbody>${tr}</tbody></table></div>`
       : `<div class="card empty">${filter === "all" ? "아직 선수가 없어요." : "이 티어에 해당하는 선수가 없어요."}</div>`}
-    <p class="hint">${S.canEdit ? "티어 칸에서 선수의 티어를 바로 지정할 수 있어요. " : ""}이름을 누르면 선호 포지션과 경기별 기록을 볼 수 있어요. 승패는 '종료'된 경기만 계산해요.</p>`;
+    <p class="hint">${S.isAdmin ? "티어 칸에서 선수의 티어를 바로 지정할 수 있어요. " : ""}이름을 누르면 선호 포지션과 경기별 기록을 볼 수 있어요. 승패는 '종료'된 경기만 계산해요.</p>`;
 }

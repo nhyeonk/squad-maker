@@ -12,7 +12,7 @@ export const MAX_LINEUP_TEAMS = TEAM_PRESETS.length;
 
 /**
  * 데이터 구조
- * players: { [id]: { id, name, pos: ["MF","FW"] (선호 순서), detail: ["CM","ST"] (세부 선호 포지션), tier: "Moment"|"S"|"A"|"B"|"C"|"F"|null, regular: 고정 참여 여부, createdAt } }
+ * players: { [id]: { id, name, pos: ["MF","FW"] (선호 순서), detail: ["CM","ST"] (세부 선호 포지션), regular: 고정 참여 여부, createdAt } }
  * matches: { [id]: { id, date, title, referee, size, formation, status: "live"|"done",
  *                    teams: [{ name, color, players: [id], roles: { [id]: "GK"|"DF"|"MF"|"FW"|"SUB" } } x2],
  *                    goals: [{ id, team: 0|1, scorer, assist, og, t }], createdAt, updatedAt } }
@@ -21,20 +21,20 @@ export const MAX_LINEUP_TEAMS = TEAM_PRESETS.length;
  */
 export const S = {
   players: {},
+  tiers: {}, // 서버에서 관리자 권한을 확인한 세션에서만 채워요.
   matches: {},
   lineup: null,
   ui: {
     tab: "lineup", team: 0, sel: null, matchId: null, sort: "goals", period: "all", tierFilter: "all",
+    hideSquadTiers: (() => { try { return localStorage.getItem("squadmaker_hide_tiers") === "1"; } catch { return false; } })(),
     matchYear: null, matchMonth: null,
     badge: (() => { try { return localStorage.getItem("squadmaker_badge") || "none"; } catch { return "none"; } })(),
   },
   mode: "local", // "local" | "remote"
   canEdit: true,
   user: null,
-  roles: null, // { owner, admins[] } (Firebase 모드, 관리자만 읽을 수 있어요)
-  rolesLoaded: false,
-  isOwner: false, // 👑 최고 관리자
-  isAdmin: true, // 🛡️ 관리자 (이 폰에만 저장하는 모드에서는 모두 관리자)
+  isAdmin: false,
+  directoryReady: false,
   ready: false,
 };
 
@@ -85,4 +85,4 @@ export const dataVersion = { n: 0 };
 export const bumpData = () => dataVersion.n++;
 
 /** 화면 다시 그리기 훅 (main.js에서 연결) */
-export const hooks = { render: () => {}, scheduleRender: () => {} };
+export const hooks = { render: () => {}, scheduleRender: () => {}, closePrivateViews: () => {} };

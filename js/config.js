@@ -27,4 +27,12 @@ export const STORAGE_KEY = "squadmaker_v1";
 export const CONFIG_KEY = "squadmaker_cfg";
 
 /** 앱 버전 (⚙️ 설정 맨 아래에 보여요). 수정해서 올릴 때 이 숫자만 올리면 폰에도 새 버전이 깔려요 */
-export const APP_VERSION = "v41";
+export const APP_VERSION = "v42";
+
+// firestore.rules의 isAdmin과 같은 명단. 원문 이메일은 웹 파일에 배포하지 않아요.
+export const ADMIN_EMAIL_HASHES = new Set([
+  "893fd79cf280723a79c23be7440fde21be42fd3f077b31814166e8ca2fee593d",
+  "1b52994e566bb235b74637e3d644f7723d43c623665974ea6a294db7af435494",
+  "e67d9de4882bf1261f7d5ac469311c6057f6bf234b030fd3a92076cf44fc85b2",
+  "43e785ffccd60b3d7af673fc90d264b35136897e957563632e2763bbb5b5cbb9",
+]);

@@ -1,64 +1,53 @@
 rules_version = '2';
 
-// 스쿼드 메이커 보안 규칙
-//  👀 방문자 (로그인 안 함)  : 보기만
-//  ✏️ 일반 회원 (구글 로그인) : 골·라인업·팀 나누기·경기 만들기/수정·선수 추가·선호 포지션·티어 지정
-//  🛡️ 관리자 (최고 관리자가 지정): + 경기 삭제, 선수 삭제, 백업 불러오기
-//  👑 최고 관리자 (아래 이메일)  : + 관리자 지정·해제
-//
-// ★ 아래 최고 관리자 이메일 한 곳만 본인 이메일로 두고,
-//   Firebase 콘솔 → Firestore → 규칙 탭에 통째로 붙여넣은 뒤 "게시"를 누르세요.
-//   관리자 지정·해제는 앱의 ⚙️ 설정에서 해요.
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function myEmail() {
-      return request.auth.token.email.lower();
-    }
-
     function signedIn() {
-      return request.auth != null
-        && request.auth.token.email != null
-        && request.auth.token.email_verified == true;
+      return request.auth != null && request.auth.token.email_verified == true;
     }
 
-    function isOwner() {
-      return signedIn() && myEmail() == 'ehdrnch@gmail.com';   // ← 최고 관리자 이메일
+    // 이메일 원문을 웹 저장소에 나열하지 않고 인증된 이메일의 SHA-256을 비교해요.
+    function isAdmin() {
+      return signedIn() && request.auth.token.email is string
+        && hashing.sha256(request.auth.token.email.lower()).toHexString().lower() in [
+          '893fd79cf280723a79c23be7440fde21be42fd3f077b31814166e8ca2fee593d',
+          '1b52994e566bb235b74637e3d644f7723d43c623665974ea6a294db7af435494',
+          'e67d9de4882bf1261f7d5ac469311c6057f6bf234b030fd3a92076cf44fc85b2',
+          '43e785ffccd60b3d7af673fc90d264b35136897e957563632e2763bbb5b5cbb9'
+        ];
     }
 
-    function isAdmin(g) {
-      return isOwner() || (
-        signedIn()
-        && exists(/databases/$(database)/documents/recorders/$(g))
-        && myEmail() in get(/databases/$(database)/documents/recorders/$(g)).data.get('admins', [])
-      );
-    }
-
-    // 관리자 명단 { owner, admins: [...] }: 관리자끼리만 볼 수 있고, 최고 관리자만 바꿔요
-    match /recorders/{g} {
-      allow read: if isOwner() || (signedIn() && myEmail() in resource.data.get('admins', []));
-      allow write: if isOwner();
-    }
-
-    // 선수: 로그인하면 추가·수정 가능 (티어 포함), 삭제는 관리자만
-    match /groups/{g}/players/{pid} {
-      allow read: if true;
-      allow create, update: if signedIn();
-      allow delete: if isAdmin(g);
-    }
-
-    // 경기: 로그인하면 만들고 고칠 수 있고 (골, 출전 선수, 빨래 당번…), 삭제는 관리자만
-    match /groups/{g}/matches/{mid} {
-      allow read: if true;
-      allow create, update: if signedIn();
-      allow delete: if isAdmin(g);
-    }
-
-    // 오늘 라인업·팀 나누기
-    match /groups/{g}/meta/{doc} {
-      allow read: if true;
-      allow write: if signedIn();
+    match /groups/{g} {
+      // 과거 문서에는 이름과 티어가 함께 있어요. 이전 후에도 관리자만 읽을 수 있어요.
+      match /players/{id} {
+        allow read: if isAdmin();
+      }
+      match /directory/v42 {
+        allow read: if true;
+        allow create, update: if isAdmin() && request.resource.data == {'ready': true};
+      }
+      match /playerProfiles/{id} {
+        allow read: if true;
+        allow create, update: if (isAdmin() ||
+          (signedIn() && exists(/databases/$(database)/documents/groups/$(g)/directory/v42)))
+          && !request.resource.data.keys().hasAny(['tier', 'skill']);
+        allow delete: if isAdmin();
+      }
+      match /playerTiers/{id} {
+        allow read, delete: if isAdmin();
+        allow create, update: if isAdmin() && request.resource.data.keys().hasOnly(['tier'])
+          && request.resource.data.tier in ['Moment', 'S', 'A', 'B', 'C', 'F']
+          && existsAfter(/databases/$(database)/documents/groups/$(g)/playerProfiles/$(id));
+      }
+      match /matches/{id} {
+        allow read: if true;
+        allow create, update: if signedIn();
+        allow delete: if isAdmin();
+      }
+      match /meta/{id} {
+        allow read: if true;
+        allow write: if signedIn();
+      }
     }
   }
 }

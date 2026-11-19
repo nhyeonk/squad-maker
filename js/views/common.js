@@ -1,11 +1,11 @@
 // 여러 화면에서 쓰는 작은 조각들
 import { P, pname } from "../state.js";
 import { PREF_DETAIL, roleOfLabel } from "../formations.js";
-import { TIERS, playerTier } from "../players.js";
+import { TIERS, playerTier, showViewTiers } from "../players.js";
 import { esc } from "../utils.js";
 
 export function tierBadge(tier) {
-  if (!tier) return "";
+  if (!tier || !showViewTiers()) return "";
   const label = `${tier} 티어 (${TIERS[tier].color})`;
   const content = tier === "Moment" ? `<img src="icons/tier-moment.png" alt="" width="30" height="24" decoding="async">` : tier;
   return `<span class="tier tier-${tier.toLowerCase()}" role="img" aria-label="${label}" title="${label}">${content}</span>`;
@@ -15,6 +15,7 @@ export const playerName = (pid) =>
   `<span class="player-name">${tierBadge(playerTier(P(pid)))}<span class="player-name-text">${esc(pname(pid))}</span></span>`;
 
 export function tierSelect(p) {
+  if (!showViewTiers()) return "";
   const current = playerTier(p);
   return `<select class="in tier-select" data-chg="ptier" data-v="${esc(p.id)}" aria-label="${esc(p.name)} 티어">
     <option value="" ${current ? "" : "selected"}>미지정</option>

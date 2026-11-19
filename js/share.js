@@ -3,7 +3,7 @@ import { S, P, pname, lineup } from "./state.js";
 import { api } from "./store.js";
 import { currentSlots, teamPlayers, poolList } from "./lineup.js";
 import { POS_COLOR } from "./formations.js";
-import { findByName, playerTier } from "./players.js";
+import { findByName, playerTier, showSquadTiers, validTier } from "./players.js";
 import { clone, download, fmtDate, todayStr, toast } from "./utils.js";
 
 /* ---------- 카톡용 명단 텍스트 ---------- */
@@ -68,6 +68,33 @@ function drawPitch(c, x, y, w, h) {
   c.strokeRect(x + w * 0.36, y + h - m - h * 0.055, w * 0.28, h * 0.055);
 }
 
+const TIER_COLORS = { Moment: ["#28241b", "#e8ce80"], S: ["#dbedef", "#284851"], A: ["#e4bd64", "#4d3511"], B: ["#d2d8dd", "#3b4851"], C: ["#cd9874", "#4e3023"], F: ["#262a2c", "#f2f3f4"] };
+
+function imageTier(pid) {
+  return showSquadTiers() ? playerTier(P(pid)) : "";
+}
+
+function drawTier(c, tier, x, y) {
+  const width = tier === "Moment" ? 38 : 24;
+  const icon = tier === "Moment" && document.querySelector(".tier-moment img");
+  if (icon?.naturalWidth) {
+    c.drawImage(icon, x, y - 13, width, 26);
+  } else {
+    c.save();
+    const [background, ink] = TIER_COLORS[tier];
+    c.fillStyle = background;
+    roundRect(c, x, y - 12, width, 24, 4);
+    c.fill();
+    c.fillStyle = ink;
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.font = font(800, tier === "Moment" ? 10 : 16);
+    c.fillText(tier, x + width / 2, y);
+    c.restore();
+  }
+  return width + 5;
+}
+
 function drawPanel(c, ox, oy, ti, st) {
   const l = lineup();
   const T = l.teams[ti];
@@ -128,14 +155,17 @@ function drawPanel(c, ox, oy, ti, st) {
       // 이름표 + 팀 색 줄
       const name = pname(pid);
       c.font = font(800, 23);
-      const tw = c.measureText(name).width + 20;
+      const tier = imageTier(pid);
+      const badgeWidth = tier ? (tier === "Moment" ? 43 : 29) : 0;
+      const tw = c.measureText(name).width + 20 + badgeWidth;
       c.fillStyle = "#1f2a24";
       roundRect(c, x - tw / 2, y + 40, tw, 36, 6);
       c.fill();
       c.fillStyle = T.color;
       c.fillRect(x - tw / 2 + 3, y + 72, tw - 6, 4);
       c.fillStyle = "#fff";
-      c.fillText(name, x, y + 58);
+      if (tier) drawTier(c, tier, x - tw / 2 + 10, y + 58);
+      c.fillText(name, x + badgeWidth / 2, y + 58);
     } else {
       c.fillStyle = "rgba(0,0,0,.18)";
       c.fill();
@@ -156,7 +186,7 @@ function drawPanel(c, ox, oy, ti, st) {
   // 오른쪽: 심판, 후보
   const sx = ox + 690, sw = 180;
   let sy = py;
-  const box = (title, lines) => {
+  const box = (title, lines, ids = []) => {
     const h = 56 + Math.max(1, lines.length) * 34;
     c.fillStyle = "#20302a";
     roundRect(c, sx, sy, sw, h, 12);
@@ -166,12 +196,17 @@ function drawPanel(c, ox, oy, ti, st) {
     c.fillText(title, sx + 16, sy + 36);
     c.font = font(700, 20);
     c.fillStyle = "rgba(255,255,255,.88)";
-    (lines.length ? lines : ["-"]).forEach((t, i) => c.fillText(t, sx + 16, sy + 74 + i * 34));
+    (lines.length ? lines : ["-"]).forEach((t, i) => {
+      const y = sy + 74 + i * 34;
+      const tier = imageTier(ids[i]);
+      const offset = tier ? drawTier(c, tier, sx + 16, y - 7) : 0;
+      c.fillText(t, sx + 16 + offset, y, sw - 32 - offset);
+    });
     sy += h + 14;
   };
   if (l.referee) box("심판", [l.referee]);
-  const bench = T.bench.filter(P).map(pname);
-  box(`후보 ${bench.length}`, bench.slice(0, 18));
+  const bench = T.bench.filter(P);
+  box(`후보 ${bench.length}`, bench.slice(0, 18).map(pname), bench);
 
   // 범례
   const legend = [["공격", "FW"], ["미드필더", "MF"], ["수비", "DF"], ["골키퍼", "GK"]];
@@ -251,7 +286,11 @@ export async function copyCanvasImage(cv) {
 
 /* ---------- 백업 ---------- */
 export function exportBackup() {
-  const data = { app: "squadmaker", v: 1, at: new Date().toISOString(), players: S.players, matches: S.matches, lineup: S.lineup };
+  const players = Object.fromEntries(Object.entries(S.players).map(([id, profile]) => {
+    const tier = playerTier(profile);
+    return [id, tier ? { ...profile, tier } : profile];
+  }));
+  const data = { app: "squadmaker", v: 1, at: new Date().toISOString(), players, matches: S.matches, lineup: S.lineup };
   download(new Blob([JSON.stringify(data, null, 1)], { type: "application/json" }), `squadmaker-backup-${todayStr()}.json`);
 }
 
@@ -277,18 +316,20 @@ export function importBackup(onDone) {
 
 /** 다른 기록 합치기. 이름이 같은 선수는 한 명으로 합쳐요 */
 export async function mergeData(d) {
+  if (!S.isAdmin) throw new Error("관리자 권한이 필요해요");
   const idMap = {};
   for (const p of Object.values(d.players || {})) {
     const ex = findByName(p.name);
     if (ex) {
       idMap[p.id] = ex.id;
       if (!(ex.pos || []).length && (p.pos || []).length) await api.putPlayer({ ...ex, pos: p.pos });
-      const tier = playerTier(p);
-      if (tier && !playerTier(S.players[ex.id])) await api.putPlayerTier(ex.id, tier);
     } else {
       idMap[p.id] = p.id;
-      await api.putPlayer(p);
+      if (!await api.putPlayer(p)) throw new Error("선수 저장 실패");
     }
+    const tier = validTier(p.tier);
+    const id = idMap[p.id];
+    if (tier && !playerTier(P(id)) && !await api.putPlayerTier(id, tier)) throw new Error("티어 저장 실패");
   }
   const r = (id) => (id ? idMap[id] || id : id);
   for (const m of Object.values(d.matches || {})) {

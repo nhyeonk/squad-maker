@@ -12,7 +12,10 @@ export const TIERS = {
   F: { color: "검정", weight: 1 },
 };
 
-export const playerTier = (p) => typeof p?.tier === "string" && Object.hasOwn(TIERS, p.tier) ? p.tier : "";
+export const validTier = (tier) => typeof tier === "string" && Object.hasOwn(TIERS, tier) ? tier : "";
+export const playerTier = (p) => S.isAdmin && p ? validTier(S.tiers[p.id]) : "";
+export const showSquadTiers = () => S.isAdmin && !S.ui.hideSquadTiers;
+export const showViewTiers = () => S.isAdmin && (S.ui.tab !== "lineup" || showSquadTiers());
 
 /** 미지정 선수는 팀을 나눌 때 중간값인 B와 같은 비중으로 계산해요. */
 export const tierWeight = (p) => TIERS[playerTier(p) || "B"].weight;
