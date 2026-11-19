@@ -4,6 +4,7 @@ import { api } from "./store.js";
 import { uid } from "./utils.js";
 
 export const TIERS = {
+  Moment: { color: "블랙·골드", weight: 6 },
   S: { color: "백금", weight: 5 },
   A: { color: "금", weight: 4 },
   B: { color: "은", weight: 3 },

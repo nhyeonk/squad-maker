@@ -37,7 +37,7 @@ function tierTable(filter) {
   const counts = Object.fromEntries(tiers.map((tier) => [tier, 0]));
   for (const p of Object.values(S.players)) counts[playerTier(p)]++;
   const buttons = tiers.map((tier) => `<button type="button" data-act="tierfilter" data-v="${tier}" aria-pressed="${filter === tier}">
-      ${tierBadge(tier) || `<span class="tier-unset">미지정</span>`}<span>${counts[tier]}명</span>
+      ${tierBadge(tier) || `<span class="tier-unset">미지정</span>`}${tier === "Moment" ? "<span>Moment</span>" : ""}<span>${counts[tier]}명</span>
     </button>`).join("");
   return `<section class="card tier-table" aria-labelledby="tier-table-title">
     <div class="row"><h3 id="tier-table-title">티어 표</h3><button type="button" class="btn sm ghost" data-act="tierfilter" data-v="all" aria-pressed="${filter === "all"}">전체 보기</button></div>

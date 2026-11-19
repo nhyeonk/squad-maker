@@ -7,7 +7,8 @@ import { esc } from "../utils.js";
 export function tierBadge(tier) {
   if (!tier) return "";
   const label = `${tier} 티어 (${TIERS[tier].color})`;
-  return `<span class="tier tier-${tier.toLowerCase()}" role="img" aria-label="${label}" title="${label}">${tier}</span>`;
+  const content = tier === "Moment" ? `<img src="icons/tier-moment.png" alt="" width="30" height="24" decoding="async">` : tier;
+  return `<span class="tier tier-${tier.toLowerCase()}" role="img" aria-label="${label}" title="${label}">${content}</span>`;
 }
 
 export const playerName = (pid) =>
